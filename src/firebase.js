@@ -2,16 +2,15 @@ import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
-// TODO: Replace with your Firebase project config.
-// Get this from Firebase console: Project settings -> General -> Your apps (Web)
 const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID'
-}
+  apiKey: "AIzaSyAUNktXGZeeXlX3LKFolXZRVQZGDohlIF0",
+  authDomain: "golfgang-79922.firebaseapp.com",
+  projectId: "golfgang-79922",
+  storageBucket: "golfgang-79922.appspot.com",
+  messagingSenderId: "223762413770",
+  appId: "1:223762413770:web:098607b8f30080df90dc33",
+  measurementId: "G-T1FXETH3K0"
+};
 
 const app = initializeApp(firebaseConfig)
 
