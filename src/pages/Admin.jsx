@@ -1,118 +1,193 @@
-import { useEffect, useState } from 'react'
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  serverTimestamp
-} from 'firebase/firestore'
-import { db } from '../firebase'
-import { useAuth } from '../providers/AuthProvider'
-import EventCard from '../components/EventCard'
+import { useEffect, useState } from "react";
+import { db } from "../firebase";
+import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { Link } from "react-router-dom";
 
 export default function Admin() {
-  const { user } = useAuth()
-  const [title, setTitle] = useState('')
-  const [date, setDate] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [events, setEvents] = useState([])
+  const [events, setEvents] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const ref = collection(db, 'events')
-    const unsub = onSnapshot(ref, (snap) => {
-      const arr = []
-      snap.forEach((doc) => arr.push({ id: doc.id, ...doc.data() }))
-      arr.sort((a, b) => {
-        const da = a.date?.toDate ? a.date.toDate() : new Date()
-        const dbb = b.date?.toDate ? b.date.toDate() : new Date()
-        return da - dbb
-      })
-      setEvents(arr)
-    })
+    async function load() {
+      const evSnap = await getDocs(collection(db, "events"));
+      const eventList = evSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    return () => unsub()
-  }, [])
+      const userSnap = await getDocs(collection(db, "users"));
+      const userList = userSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!title || !date) return
-    setLoading(true)
-    try {
-      const ref = collection(db, 'events')
-      await addDoc(ref, {
-        title,
-        date: new Date(date),
-        createdBy: user.uid,
-        createdAt: serverTimestamp()
-      })
-      setTitle('')
-      setDate('')
-    } finally {
-      setLoading(false)
+      setEvents(eventList);
+      setUsers(userList);
+      setLoading(false);
     }
-  }
+    load();
+  }, []);
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this event?')) return
-    await deleteDoc(doc(db, 'events', id))
+  const deleteEvent = async (id) => {
+    if (!confirm("Really delete this event?")) return;
+    await deleteDoc(doc(db, "events", id));
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const toggleAdmin = async (uid, isAdmin) => {
+    const ref = doc(db, "users", uid);
+    await updateDoc(ref, { isAdmin: !isAdmin });
+    setUsers((prev) =>
+      prev.map((u) => (u.id === uid ? { ...u, isAdmin: !isAdmin } : u))
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="card">
+          <p>Loading admin tools…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div>
-      <h1>Admin</h1>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <h2 style={{ marginTop: 0 }}>Create event</h2>
-        <form onSubmit={handleCreate}>
-          <label>
-            Title
-            <input
-              className="input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Round at Albert Park"
-            />
-          </label>
-          <div style={{ height: '0.75rem' }} />
-          <label>
-            Date
-            <input
-              className="input"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
-          <button
-            className="btn btn-primary"
-            type="submit"
-            style={{ marginTop: '0.75rem' }}
-            disabled={loading}
-          >
-            {loading ? 'Creating...' : 'Create'}
-          </button>
-        </form>
+    <div className="page">
+
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="page-header-title">
+          <h1>Admin Panel</h1>
+          <p>Manage events, users, and admin privileges.</p>
+        </div>
       </div>
 
-      <h2>All events</h2>
-      {events.map((ev) => (
-        <div key={ev.id} style={{ position: 'relative' }}>
-          <EventCard event={ev} />
-          <button
-            className="btn btn-danger"
-            style={{
-              position: 'absolute',
-              top: 10,
-              right: 10,
-              fontSize: '0.75rem',
-              padding: '0.25rem 0.75rem'
-            }}
-            onClick={() => handleDelete(ev.id)}
-          >
-            Delete
-          </button>
+
+      {/* EVENTS SECTION */}
+      <div className="card" style={{ marginBottom: 28 }}>
+
+        <div className="card-header">
+          <div className="card-title-group">
+            <h3 className="card-title">Events</h3>
+            <p className="card-subtitle">Manage all scheduled rounds</p>
+          </div>
         </div>
-      ))}
+
+        <div className="card-body" style={{ paddingTop: 0 }}>
+          {events.map((ev, idx) => {
+            const dateString = ev.date?.toDate?.().toLocaleString("en-AU", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+
+            return (
+              <div
+                key={ev.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "14px 0",
+                  borderBottom:
+                    idx < events.length - 1
+                      ? "1px solid var(--color-border-subtle)"
+                      : "none",
+                }}
+              >
+                {/* LEFT SIDE: Title + date */}
+             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <span style={{ fontWeight: 600, fontSize: 15 }}>{ev.title}</span>
+
+    <span
+      className={`event-status-badge ${
+        ev.booked ? "event-status-booked" : "event-status-proposed"
+      }`}
+    >
+      {ev.booked ? "Booked" : "Proposed"}
+    </span>
+  </div>
+
+  <span className="text-soft" style={{ fontSize: 13 }}>
+    {dateString}
+  </span>
+</div>
+
+
+                {/* RIGHT SIDE: Buttons */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <Link to={`/event/${ev.id}`} className="btn btn-primary btn-sm">
+                    Open
+                  </Link>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => deleteEvent(ev.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+
+      {/* USERS SECTION */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title-group">
+            <h3 className="card-title">Users</h3>
+            <p className="card-subtitle">Manage member privileges</p>
+          </div>
+        </div>
+
+        <div className="card-body" style={{ paddingTop: 0 }}>
+          {users.map((u, idx) => (
+            <div
+              key={u.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "14px 0",
+                borderBottom:
+                  idx < users.length - 1
+                    ? "1px solid var(--color-border-subtle)"
+                    : "none",
+              }}
+            >
+              {/* USER EMAIL + role badge */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 15 }}>{u.email}</span>
+
+                {u.isAdmin && (
+                  <span
+                    style={{
+                      background: "var(--color-primary-soft)",
+                      padding: "2px 8px",
+                      borderRadius: "var(--radius-pill)",
+                      fontSize: 11,
+                      color: "var(--color-primary)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    admin
+                  </span>
+                )}
+              </div>
+
+              {/* ACTION BUTTON */}
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => toggleAdmin(u.id, u.isAdmin)}
+              >
+                {u.isAdmin ? "Remove Admin" : "Make Admin"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
-  )
+  );
 }

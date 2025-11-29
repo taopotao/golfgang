@@ -1,0 +1,364 @@
+
+/* GolfGang Modern UI Theme Pack */
+
+/* ------------------------------------------------------
+   THEME VARIABLES — Global Design System
+------------------------------------------------------ */
+
+:root {
+  --font-ui: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Light mode colors */
+  --background: #f8f9fc;
+  --background-subtle: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f2f4f8;
+
+  --text: #111418;
+  --text-muted: #6c7280;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+
+  --success: #22c55e;
+  --border: rgba(0,0,0,0.10);
+
+  --radius: 12px;
+  --shadow: 0 2px 10px rgba(0,0,0,0.04);
+
+  /* Spacing scale */
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+}
+
+/* Dark mode */
+[data-theme="dark"] {
+  --background: #111418;
+  --background-subtle: #1b1f24;
+  --surface: #1f2329;
+  --surface-2: #2a2e35;
+
+  --text: #ffffff;
+  --text-muted: #9ea3b0;
+
+  --border: rgba(255,255,255,0.08);
+  --shadow: 0 2px 14px rgba(0,0,0,0.45);
+}
+
+/* ------------------------------------------------------
+   GLOBAL ELEMENTS
+------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+  background: var(--background);
+  color: var(--text);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+p {
+  line-height: 1.55;
+}
+
+/* ------------------------------------------------------
+   LAYOUT HELPERS
+------------------------------------------------------ */
+
+.page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem 2rem;
+}
+
+/* Top navigation (if needed) */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.navbar-left,
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+/* ------------------------------------------------------
+   SURFACES & CARDS
+------------------------------------------------------ */
+
+.surface {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: var(--space-6);
+}
+
+/* A softer, secondary surface variant */
+.surface-secondary {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: var(--space-4);
+}
+
+/* ------------------------------------------------------
+   FORMS
+------------------------------------------------------ */
+
+label {
+  display: block;
+  font-size: .85rem;
+  margin-bottom: .25rem;
+  color: var(--text-muted);
+}
+
+.input {
+  width: 100%;
+  padding: .65rem .85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: .95rem;
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(79,70,229,0.35);
+}
+
+/* Textarea uses same base */
+textarea.input {
+  resize: vertical;
+}
+
+/* Helper text under fields */
+.helper-text {
+  font-size: .8rem;
+  color: var(--text-muted);
+  margin-top: .15rem;
+}
+
+/* ------------------------------------------------------
+   BUTTONS
+------------------------------------------------------ */
+
+.btn {
+  padding: .6rem 1.1rem;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: .95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  transition: background .12s ease, transform .08s ease, box-shadow .12s ease, opacity .12s ease;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--background-subtle);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+/* Small pill-style button */
+.btn-pill {
+  padding: .35rem .75rem;
+  border-radius: 999px;
+  font-size: .8rem;
+}
+
+/* ------------------------------------------------------
+   CHIPS / DOTS
+------------------------------------------------------ */
+
+.chip-dot {
+  display: inline-block;
+  width: .55rem;
+  height: .55rem;
+  border-radius: 999px;
+  margin-right: .25rem;
+}
+
+.chip-dot.green {
+  background: #4ade80;
+}
+
+.chip-dot.yellow {
+  background: #facc15;
+}
+
+.chip-dot.red {
+  background: #f87171;
+}
+
+/* ------------------------------------------------------
+   MODALS
+------------------------------------------------------ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+}
+
+/* ------------------------------------------------------
+   CALENDAR GRID (Dashboard)
+------------------------------------------------------ */
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: .4rem;
+}
+
+.calendar-day {
+  padding: .7rem .5rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  font-size: .85rem;
+}
+
+.calendar-day--has-events {
+  background: #ede9fe;
+  border-color: rgba(79,70,229,0.4);
+}
+
+/* ------------------------------------------------------
+   AUTH PAGES
+------------------------------------------------------ */
+
+.auth-card {
+  max-width: 420px;
+  margin: 4rem auto;
+  padding: 1rem;
+}
+
+.auth-card-inner {
+  padding: 2rem;
+}
+
+/* ------------------------------------------------------
+   MISC
+------------------------------------------------------ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.badge-primary {
+  background: rgba(79,70,229,0.12);
+  color: var(--primary);
+}
+
+.badge-danger {
+  background: rgba(239,68,68,0.1);
+  color: var(--danger);
+}

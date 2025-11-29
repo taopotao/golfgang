@@ -1,38 +1,85 @@
-export default function ResponseButtons({ currentStatus, onChange, loading }) {
-  const makeHandler = (status) => () => onChange(status)
+// src/components/ResponseButtons.jsx
 
-  const baseStyle = (active) => ({
-    flex: 1,
-    marginRight: '0.5rem',
-    opacity: active ? 1 : 0.75
-  })
+export default function ResponseButtons({
+  currentStatus,
+  onChange,
+  loading,
+}) {
+  const isAvailable = currentStatus === "available";
+  const isUnavailable = currentStatus === "unavailable";
+
+  const handleClick = (status) => {
+    if (loading) return;
+
+    if (status === currentStatus) {
+      // Clicking again toggles the response off
+      onChange(null);
+    } else {
+      onChange(status);
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', marginTop: '0.75rem' }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 16,
+        flexWrap: "wrap",
+      }}
+    >
+      {/* AVAILABLE */}
       <button
-        className="btn btn-primary"
-        style={baseStyle(currentStatus === 'yes')}
-        onClick={makeHandler('yes')}
+        type="button"
+        onClick={() => handleClick("available")}
         disabled={loading}
+        style={{
+          flex: 1,
+          minWidth: 160,
+          padding: "12px 18px",
+          borderRadius: 999,
+          border: "none",
+          cursor: loading ? "default" : "pointer",
+          background: isAvailable
+            ? "linear-gradient(90deg, #7c5cff, #8b7bff)"
+            : "var(--color-surface-soft)",
+          color: isAvailable ? "#fff" : "var(--color-text)",
+          fontWeight: 600,
+          fontSize: 14,
+          boxShadow: isAvailable
+            ? "0 6px 18px rgba(124,92,255,0.45)"
+            : "none",
+          opacity: loading ? 0.7 : 1,
+          transition: "150ms ease",
+        }}
       >
-        ✅ Yes
+        {loading && isAvailable ? "Saving…" : "Available"}
       </button>
+
+      {/* UNAVAILABLE */}
       <button
-        className="btn btn-secondary"
-        style={baseStyle(currentStatus === 'maybe')}
-        onClick={makeHandler('maybe')}
+        type="button"
+        onClick={() => handleClick("unavailable")}
         disabled={loading}
+        style={{
+          flex: 1,
+          minWidth: 160,
+          padding: "12px 18px",
+          borderRadius: 999,
+          border: "none",
+          cursor: loading ? "default" : "pointer",
+          background: isUnavailable ? "#f97373" : "var(--color-surface-soft)",
+          color: isUnavailable ? "#fff" : "var(--color-text)",
+          fontWeight: 600,
+          fontSize: 14,
+          boxShadow: isUnavailable
+            ? "0 6px 18px rgba(248,113,113,0.45)"
+            : "none",
+          opacity: loading ? 0.7 : 1,
+          transition: "150ms ease",
+        }}
       >
-        ❔ Maybe
-      </button>
-      <button
-        className="btn btn-danger"
-        style={{ flex: 1, opacity: currentStatus === 'no' ? 1 : 0.75 }}
-        onClick={makeHandler('no')}
-        disabled={loading}
-      >
-        ❌ No
+        {loading && isUnavailable ? "Saving…" : "Not Available"}
       </button>
     </div>
-  )
+  );
 }

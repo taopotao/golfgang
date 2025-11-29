@@ -1,110 +1,159 @@
-import { useState } from 'react'
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
-} from 'firebase/auth'
-import { auth, db } from '../firebase'
-import { doc, setDoc } from 'firebase/firestore'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../providers/AuthProvider'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth, db } from "../firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isRegister, setIsRegister] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const navigate = useNavigate();
 
-  if (user) {
-    navigate('/')
-  }
+  const [identifier, setIdentifier] = useState(""); // email OR username
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+  async function handleLogin(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      if (isRegister) {
-        const cred = await createUserWithEmailAndPassword(auth, email, password)
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          email,
-          isAdmin: false
-        })
-      } else {
-        await signInWithEmailAndPassword(auth, email, password)
+      let emailToUse = identifier.trim();
+
+      // If user typed a username, convert it to email
+      if (!identifier.includes("@")) {
+        // Lookup username in Firestore
+        const q = query(
+          collection(db, "users"),
+          where("username", "==", identifier.trim().toLowerCase())
+        );
+
+        const snap = await getDocs(q);
+
+        if (snap.empty) throw new Error("Username not found.");
+
+        const userDoc = snap.docs[0].data();
+        emailToUse = userDoc.email;
       }
-      navigate('/')
+
+      // Now perform login with email + password
+      await signInWithEmailAndPassword(auth, emailToUse, password);
+
+      navigate("/");
     } catch (err) {
-      console.error(err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
+      console.error(err);
+      setError(err.message || "Failed to sign in.");
     }
+
+    setLoading(false);
   }
 
   return (
-    <div className="card" style={{ marginTop: '3rem' }}>
-      <h1>{isRegister ? 'Register' : 'Login'}</h1>
-      <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-        Only your GolfGang should have accounts here.
+  <div
+    style={{
+      minHeight: "calc(100vh - 80px)", // keep navbar spacing consistent
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: "2rem",
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        padding: "2.5rem 2rem",
+        background: "var(--surface)",
+        borderRadius: "16px",
+        boxShadow: "0 4px 18px rgba(0,0,0,0.08)",
+      }}
+    >
+      <h1 style={{ marginTop: 0, marginBottom: "0.5rem", fontSize: "1.8rem" }}>
+        Sign in
+      </h1>
+
+      <p style={{ marginTop: 0, marginBottom: "1.8rem", color: "var(--text-muted)" }}>
+        Use your email or username to log in
       </p>
 
-      <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
-        <label>
-          Email
+      {error && (
+        <p style={{ color: "var(--danger)", marginBottom: "1rem" }}>
+          {error}
+        </p>
+      )}
+
+      <form onSubmit={handleLogin}>
+        {/* Identifier */}
+        <div style={{ marginBottom: "1.2rem" }}>
+          <label style={{ display: "block", marginBottom: "0.35rem" }}>
+            Email or username
+          </label>
           <input
             className="input"
-            type="email"
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="e.g. tao@gmail.com OR taopotao"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            style={{ width: "100%" }}   // ← add this
           />
-        </label>
-        <div style={{ height: '0.75rem' }} />
-        <label>
-          Password
+        </div>
+
+        {/* Password */}
+        <div style={{ marginBottom: "1.6rem" }}>
+          <label style={{ display: "block", marginBottom: "0.35rem" }}>
+            Password
+          </label>
           <input
             className="input"
             type="password"
-            required
-            minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="Your password"
+            required
+            style={{ width: "100%" }}
           />
-        </label>
+        </div>
 
-        {error && (
-          <p style={{ color: '#f97373', marginTop: '0.5rem' }}>{error}</p>
-        )}
-
+        {/* Submit */}
         <button
-          type="submit"
           className="btn btn-primary"
-          style={{ marginTop: '1rem', width: '100%' }}
+          style={{
+            width: "100%",
+            height: 44,
+            borderRadius: 10,
+            fontSize: 15,
+            marginBottom: "1.4rem",
+          }}
           disabled={loading}
+          type="submit"
         >
-          {loading
-            ? 'Working...'
-            : isRegister
-            ? 'Create account'
-            : 'Login'}
+          {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
 
-      <button
-        className="btn btn-secondary"
-        style={{ marginTop: '0.75rem', width: '100%' }}
-        type="button"
-        onClick={() => setIsRegister((v) => !v)}
-      >
-        {isRegister
-          ? 'Already have an account? Login'
-          : 'Need an account? Register'}
-      </button>
+      {/* Links */}
+      <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
+        <a
+          href="/signup"
+          style={{
+            display: "block",
+            marginBottom: "0.6rem",
+            color: "var(--primary)",
+            fontSize: 14,
+          }}
+        >
+          Create an account
+        </a>
+
+        <a
+          href="/reset-password"
+          style={{ color: "var(--primary)", fontSize: 14 }}
+        >
+          Forgot password?
+        </a>
+      </div>
     </div>
-  )
+  </div>
+);
 }

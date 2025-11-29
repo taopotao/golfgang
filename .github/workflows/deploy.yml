@@ -2,16 +2,22 @@ name: Deploy Vite site to GitHub Pages
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ "main" ]       # Auto deploy on push to main
+  workflow_dispatch:            # Manual run button
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -22,18 +28,19 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Upload build output
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist   # 👈 IMPORTANT — this is where Vite outputs files
+          path: ./dist       # Vite outputs to /dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
+
+    environment:
+      name: github-pages
+      url: https://taopotao.github.io/golfgang/
 
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         uses: actions/deploy-pages@v4
