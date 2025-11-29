@@ -3,12 +3,15 @@ import { useAuth } from "../providers/AuthProvider";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { useTheme } from "../providers/ThemeProvider";
+import { useState } from "react";
 
 export default function Navbar() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -19,124 +22,132 @@ export default function Navbar() {
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
-    <header className="top-nav">
-      <div className="top-nav-inner">
-        {/* LEFT: Brand + links */}
-        <div className="top-nav-left">
-          <div className="brand-mark" />
-          <div className="brand-title">
-            <span className="brand-title-main">GolfGang</span>
-            <span className="brand-title-sub">
-              Tee Time Planner
-            </span>
-          </div>
+  <header className="top-nav">
+    <div className="top-nav-inner">
 
-          {user && (
+      {/* LEFT — Brand */}
+      <div className="top-nav-left">
+        <div className="brand-mark" />
+        <div className="brand-title">
+          <span className="brand-title-main">GolfGang</span>
+          <span className="brand-title-sub">Tee Time Planner</span>
+        </div>
+      </div>
+
+      {/* RIGHT — Desktop menu */}
+      <div className="top-nav-right desktop-only nav-desktop">
+        {user && (
+          <>
             <nav className="top-nav-links">
-              <Link
-                to="/"
-                className={isDashboard ? "active" : undefined}
-              >
+              <Link to="/" className={location.pathname === "/" ? "active" : undefined}>
                 Calendar
               </Link>
 
               {isAdmin && (
                 <Link
                   to="/admin"
-                  className={isAdminRoute ? "active" : undefined}
+                  className={location.pathname.startsWith("/admin") ? "active" : undefined}
                 >
                   Admin
                 </Link>
               )}
             </nav>
-          )}
-        </div>
 
-        {/* RIGHT: theme toggle + profile + auth */}
-        <div className="top-nav-right">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            style={{
-              position: "relative",
-              width: 56,
-              height: 28,
-              borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.16)",
-              background:
-                theme === "dark"
-                  ? "rgba(15,15,30,0.9)"
-                  : "rgba(250,250,255,0.08)",
-              display: "flex",
-              alignItems: "center",
-              padding: "0 6px",
-              cursor: "pointer",
-              gap: 6,
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: 3,
-                left: theme === "dark" ? 28 : 3,
-                width: 22,
-                height: 22,
-                borderRadius: 999,
-                background:
-                  theme === "dark"
-                    ? "linear-gradient(135deg,#8b7bff,#b6aeff)"
-                    : "#ffffff",
-                boxShadow: "0 6px 16px rgba(0,0,0,0.5)",
-                transition: "left 0.18s ease",
-              }}
-            />
-            <span style={{ fontSize: 12, zIndex: 1 }}>☀️</span>
-            <span style={{ fontSize: 12, zIndex: 1 }}>🌙</span>
-          </button>
+            <button onClick={toggleTheme} className="theme-toggle-btn">
+              <div
+                className="theme-toggle-thumb"
+                style={{
+                  left: theme === "dark" ? 30 : 3,
+                }}
+              />
+              <span>☀️</span>
+              <span>🌙</span>
+            </button>
 
-          {user && (
+            <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm">
+              Profile
+            </button>
+
+            <span className="user-email">
+              {user.email}
+              {isAdmin && " · admin"}
+            </span>
+
+            <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+              Logout
+            </button>
+          </>
+        )}
+
+        {!user && (
+          <Link to="/login" className="btn btn-primary btn-sm">
+            Login
+          </Link>
+        )}
+      </div>
+
+      {/* MOBILE HAMBURGER BUTTON */}
+      <button
+        className="nav-hamburger mobile-only"
+        onClick={() => setMobileMenuOpen((x) => !x)}
+      >
+        ☰
+      </button>
+    </div>
+
+    {/* MOBILE MENU */}
+    {mobileMenuOpen && (
+      <div className="mobile-menu mobile-only">
+        {user && (
+          <>
+            <Link to="/" onClick={() => setMobileMenuOpen(false)}>
+              Calendar
+            </Link>
+
+            {isAdmin && (
+              <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
+                Admin
+              </Link>
+            )}
+
+            <button onClick={toggleTheme} className="theme-toggle-btn">
+              <div
+                className="theme-toggle-thumb"
+                style={{
+                  left: theme === "dark" ? 30 : 3,
+                }}
+              />
+              <span>☀️</span>
+              <span>🌙</span>
+            </button>
+
             <button
-              onClick={() => navigate("/profile")}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                navigate("/profile");
+              }}
               className="btn btn-ghost btn-sm"
             >
               Profile
             </button>
-          )}
 
-          {user && (
-            <>
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "var(--color-text-soft)",
-                  maxWidth: 180,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-                title={user.email}
-              >
-                {user.email}
-                {isAdmin && " · admin"}
-              </span>
+            <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+              Logout
+            </button>
+          </>
+        )}
 
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </>
-          )}
-
-          {!user && (
-            <Link to="/login" className="btn btn-primary btn-sm">
-              Login
-            </Link>
-          )}
-        </div>
+        {!user && (
+          <Link
+            to="/login"
+            className="btn btn-primary btn-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Login
+          </Link>
+        )}
       </div>
-    </header>
-  );
+    )}
+  </header>
+);
 }

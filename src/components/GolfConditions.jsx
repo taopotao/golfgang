@@ -46,36 +46,37 @@ export default function GolfConditions({ placeId, date, tee }) {
   return (
   <div
     style={{
-      marginTop: "12px",
+      marginTop: "0px",
       padding: "12px 14px",
       background: "var(--color-surface-soft)",
-      borderRadius: "12px",
+      borderRadius: 12,
       width: "100%",
       boxSizing: "border-box",
     }}
   >
-    <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: 600 }}>
-  Golf Conditions
-</h4>
+    <h4 style={{ margin: "0 0 4px 0", fontSize: 15, fontWeight: 600 }}>
+      Golf Conditions
+    </h4>
 
-<div
-  style={{
-    fontSize: "12px",
-    color: "var(--text-muted)",
-    marginBottom: "8px",
-  }}
->
-  {date?.toDate
-    ? date.toDate().toLocaleDateString("en-AU", {
-        weekday: "long",
-        day: "numeric",
-        month: "short",
-      })
-    : "Event date TBA"}{" "}
-  {tee && `· Tee time ${tee}`}
-</div>
+    <div
+      style={{
+        fontSize: 12,
+        color: "var(--text-muted)",
+        marginBottom: 8,
+      }}
+    >
+      {/* adjust this based on how date is stored */}
+      {date?.toDate
+        ? date.toDate().toLocaleDateString("en-AU", {
+            weekday: "long",
+            day: "numeric",
+            month: "short",
+          })
+        : "Event date"}{" "}
+      {tee && `· Tee time ${tee}`}
+    </div>
 
-    <div style={{ fontSize: "13px", lineHeight: 1.4 }}>
+    <div style={{ fontSize: 13, lineHeight: 1.4 }}>
       <div><strong>Score:</strong> {cleanScore} / 10</div>
       <div><strong>Temp:</strong> {temp}°C</div>
       <div><strong>Rain:</strong> {rain}%</div>

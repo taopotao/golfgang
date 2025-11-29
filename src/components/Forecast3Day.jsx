@@ -22,19 +22,19 @@ export default function Forecast3Day({ placeId }) {
   <div
     className="card"
     style={{
-      padding: "20px",
-      marginBottom: "20px",
-      borderRadius: "16px",
-      background: "var(--surface-elevated)",
+      padding: 20,
+      marginBottom: 20,
+      borderRadius: 16,
+      background: "var(--color-surface)",
     }}
   >
-    <h3 style={{ margin: 0, marginBottom: "16px" }}>3-Day Forecast</h3>
+    <h3 style={{ margin: 0, marginBottom: 12, fontSize: 16 }}>3-day forecast</h3>
 
     {daily.time.slice(0, 3).map((day, i) => {
       const temp = daily.temperature_2m_max[i];
       const rain = daily.precipitation_probability_max[i];
       const icon = iconForWeather(daily.weathercode[i]);
-      const date = new Date(day).toLocaleDateString("en-AU", {
+      const label = new Date(day).toLocaleDateString("en-AU", {
         weekday: "short",
       });
 
@@ -45,29 +45,26 @@ export default function Forecast3Day({ placeId }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "10px 0",
+            padding: "8px 0",
             borderBottom:
               i < 2 ? "1px solid var(--color-border-subtle)" : "none",
-            fontSize: "15px",
+            fontSize: 14,
           }}
         >
-          <div style={{ width: "60px", opacity: 0.9 }}>{date}</div>
-
-          <div style={{ width: "40px", textAlign: "center", fontSize: "18px" }}>
+          <span style={{ width: 52 }}>{label}</span>
+          <span style={{ fontSize: 18, width: 32, textAlign: "center" }}>
             {icon}
-          </div>
-
-          <div style={{ width: "80px", fontWeight: 500 }}>{temp}°C</div>
-
-          <div
+          </span>
+          <span style={{ minWidth: 64, fontWeight: 500 }}>{temp}°C</span>
+          <span
             style={{
-              width: "80px",
+              minWidth: 70,
               textAlign: "right",
-              color: "var(--text-muted)",
+              color: "var(--color-text-muted)",
             }}
           >
             {rain}% rain
-          </div>
+          </span>
         </div>
       );
     })}
