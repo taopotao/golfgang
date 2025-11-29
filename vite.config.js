@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/golfgang/",
+  base: "/golfgang/?v=2",
   build: {
     cssCodeSplit: false,
     assetsInlineLimit: 0,
