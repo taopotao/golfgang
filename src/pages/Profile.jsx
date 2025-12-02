@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../providers/AuthProvider";
 import { auth, db } from "../firebase";
+import NotificationSettings from '../components/NotificationSettings';
 import {
   updateEmail,
   updatePassword,
@@ -117,6 +118,9 @@ export default function Profile() {
         style={{ maxWidth: 520, margin: "3rem auto" }}
       >
         <div className="card-header">
+
+          <NotificationSettings />
+          
           <div className="card-title-group">
             <h1 className="card-title">Your profile</h1>
             <p className="card-subtitle">

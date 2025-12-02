@@ -10,7 +10,9 @@ export default function Dashboard() {
 
   const [events, setEvents] = useState([]);
   const [selectedDay, setSelectedDay] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [selectedDayEvents, setSelectedDayEvents] = useState([]);
+  const [showDayModal, setShowDayModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Form fields
   const [title, setTitle] = useState("");
@@ -60,24 +62,34 @@ export default function Dashboard() {
     if (currentMonth === 11) setCurrentYear((y) => y + 1);
   };
 
-  const openCreateModal = (day) => {
+  // Helper for ordinal suffix
+  const ordinal = (n) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
+  const openDayModal = (day) => {
     const date = new Date(currentYear, currentMonth, day);
+    const key = date.toISOString().split("T")[0];
+    const dayEvents = eventsByDay[key] || [];
+    
     setSelectedDay(date);
+    setSelectedDayEvents(dayEvents);
+    setShowDayModal(true);
+  };
+
+  const openCreateModal = () => {
+    if (!selectedDay) return;
     
     // Auto-generate title like "⛳ Saturday 6th December"
-    const dayOfWeek = date.toLocaleDateString("en-AU", { weekday: "long" });
-    const dayNum = date.getDate();
-    const month = date.toLocaleDateString("en-AU", { month: "long" });
-    
-    // Add ordinal suffix (1st, 2nd, 3rd, etc.)
-    const ordinal = (n) => {
-      const s = ["th", "st", "nd", "rd"];
-      const v = n % 100;
-      return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    };
+    const dayOfWeek = selectedDay.toLocaleDateString("en-AU", { weekday: "long" });
+    const dayNum = selectedDay.getDate();
+    const month = selectedDay.toLocaleDateString("en-AU", { month: "long" });
     
     setTitle(`⛳ ${dayOfWeek} ${ordinal(dayNum)} ${month}`);
-    setShowModal(true);
+    setShowDayModal(false);
+    setShowCreateModal(true);
   };
 
   // -------------------------
@@ -117,7 +129,7 @@ export default function Dashboard() {
     setNotes("");
     setRsvpDeadline("");
     setCreating(false);
-    setShowModal(false);
+    setShowCreateModal(false);
   };
 
   // -------------------------
@@ -136,30 +148,36 @@ export default function Dashboard() {
   return (
     <div className="page">
 
-      {/* ---------- HEADER ---------- */}
-      <div className="page-header">
-        <div className="page-header-title">
-          <h1>Calendar</h1>
-          <p>View scheduled rounds and create new events.</p>
-        </div>
-      </div>
-
       {/* ---------- CALENDAR CARD ---------- */}
-      <div className="card" style={{ marginBottom: "2rem", overflow: "hidden" }}>
+      <div className="card" style={{ marginBottom: 20, overflow: "hidden" }}>
         <div className="card-header">
-          <div className="card-title-group">
-            <h3 className="card-title">
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>
               {firstDayOfMonth.toLocaleDateString("en-AU", {
-                year: "numeric",
                 month: "long",
+                year: "numeric",
               })}
-            </h3>
-            <p className="card-subtitle">Tap a date to create an event</p>
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+              Tap a day to view events
+            </p>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-ghost btn-sm" onClick={prevMonth}>‹</button>
-            <button className="btn btn-ghost btn-sm" onClick={nextMonth}>›</button>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button 
+              className="btn btn-ghost btn-sm" 
+              onClick={prevMonth}
+              style={{ padding: "8px 12px" }}
+            >
+              ←
+            </button>
+            <button 
+              className="btn btn-ghost btn-sm" 
+              onClick={nextMonth}
+              style={{ padding: "8px 12px" }}
+            >
+              →
+            </button>
           </div>
         </div>
 
@@ -200,15 +218,16 @@ export default function Dashboard() {
               today.getDate() === day && 
               today.getMonth() === currentMonth && 
               today.getFullYear() === currentYear;
+            const hasEvents = dayEvents.length > 0;
 
             return (
               <div
                 key={day}
-                onClick={() => isAdmin && openCreateModal(day)}
+                onClick={() => openDayModal(day)}
                 style={{
                   padding: "8px 4px",
                   borderRadius: 8,
-                  background: dayEvents.length
+                  background: hasEvents
                     ? dayEvents.some(ev => ev.booked) 
                       ? "var(--color-success-soft)" 
                       : "var(--color-primary-soft)"
@@ -216,7 +235,7 @@ export default function Dashboard() {
                   border: isToday 
                     ? "2px solid var(--color-primary)" 
                     : "1px solid var(--color-border-subtle)",
-                  cursor: isAdmin ? "pointer" : "default",
+                  cursor: "pointer",
                   textAlign: "center",
                   minHeight: 44,
                   display: "flex",
@@ -224,7 +243,10 @@ export default function Dashboard() {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 2,
+                  transition: "transform 0.1s ease",
                 }}
+                onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+                onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
               >
                 <div style={{ 
                   fontSize: "14px", 
@@ -373,7 +395,7 @@ export default function Dashboard() {
       </div>
 
       {/* ---------- CREATE EVENT MODAL ---------- */}
-      {showModal && (
+      {showCreateModal && (
   <div className="modal-backdrop">
     <div className="modal" style={{ width: "100%", maxWidth: 480 }}>
 
@@ -460,7 +482,7 @@ export default function Dashboard() {
         <button
           className="btn btn-ghost"
           style={{ width: "100%" }}
-          onClick={() => setShowModal(false)}
+          onClick={() => setShowCreateModal(false)}
         >
           Cancel
         </button>
@@ -468,6 +490,133 @@ export default function Dashboard() {
     </div>
   </div>
 )}
+
+      {/* ---------- DAY MODAL - Show events for selected day ---------- */}
+      {showDayModal && (
+        <div className="modal-backdrop" onClick={() => setShowDayModal(false)}>
+          <div 
+            className="modal" 
+            style={{ width: "100%", maxWidth: 400 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 20 }}>
+                {selectedDay?.toLocaleDateString("en-AU", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </h2>
+            </div>
+
+            {/* Events on this day */}
+            {selectedDayEvents.length > 0 ? (
+              <div style={{ marginBottom: 20 }}>
+                {selectedDayEvents.map((ev) => {
+                  const attendingCount = ev.responses 
+                    ? Object.values(ev.responses).filter(s => s === 'available').length 
+                    : 0;
+                  const myStatus = user && ev.responses ? ev.responses[user.uid] : null;
+                  
+                  return (
+                    <Link
+                      key={ev.id}
+                      to={`/event/${ev.id}`}
+                      onClick={() => setShowDayModal(false)}
+                      style={{
+                        display: "block",
+                        padding: "14px",
+                        background: "var(--color-surface-soft)",
+                        borderRadius: 12,
+                        marginBottom: 10,
+                        textDecoration: "none",
+                        color: "inherit",
+                        borderLeft: myStatus === 'available' 
+                          ? "3px solid var(--color-success)" 
+                          : "3px solid transparent",
+                      }}
+                    >
+                      <div style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between", 
+                        alignItems: "center",
+                        marginBottom: 4,
+                      }}>
+                        <span style={{ fontWeight: 600 }}>{ev.title}</span>
+                        <span style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 99,
+                          background: ev.booked ? "var(--color-success)" : "var(--color-warning)",
+                          color: "#fff",
+                          fontWeight: 600,
+                        }}>
+                          {ev.booked ? "BOOKED" : "PROPOSED"}
+                        </span>
+                      </div>
+                      {ev.tee && (
+                        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                          🕐 {ev.tee}
+                        </div>
+                      )}
+                      {ev.courseName && (
+                        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                          📍 {ev.courseName}
+                        </div>
+                      )}
+                      <div style={{ 
+                        marginTop: 8, 
+                        fontSize: 12, 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: 8 
+                      }}>
+                        <span>👥 {attendingCount}/4</span>
+                        {myStatus === 'available' && (
+                          <span style={{ color: "var(--color-success)" }}>✓ You're in</span>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ 
+                padding: "24px", 
+                textAlign: "center", 
+                color: "var(--color-text-muted)",
+                background: "var(--color-surface-soft)",
+                borderRadius: 12,
+                marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🏌️</div>
+                <div>No events on this day</div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 10 }}>
+              {isAdmin && (
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={openCreateModal}
+                >
+                  + Create Event
+                </button>
+              )}
+              <button
+                className="btn btn-ghost"
+                style={{ flex: isAdmin ? 0 : 1 }}
+                onClick={() => setShowDayModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

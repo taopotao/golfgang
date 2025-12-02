@@ -53,9 +53,12 @@ function buildGoogleCalendarUrl(event, eventUrl) {
     endDateTime
   )}`;
 
+  // Build title: "⛳ 14:30 - Asquith Golf Club"
+  const calendarTitle = `⛳ ${teeTime || "Golf"} - ${courseName || "Golf Round"}`;
+
   const params = new URLSearchParams({
     action: "TEMPLATE",
-    text: event.title || "Golf round",
+    text: calendarTitle,
     dates: datesParam,
     details: notes
       ? `${notes}\n\nEvent details: ${eventUrl}`
@@ -391,9 +394,21 @@ export default function EventPage() {
 
   const date = event.date?.toDate ? event.date.toDate() : null;
 
-  const attendingIds = Object.entries(responses)
+  // Get all players who responded "available", ordered by response time if available
+  const allAttendingIds = Object.entries(responses)
     .filter(([_, status]) => status === "available")
     .map(([uid]) => uid);
+  
+  // First MAX_PLAYERS are confirmed, rest are reserves
+  const confirmedIds = allAttendingIds.slice(0, MAX_PLAYERS);
+  const reserveIds = allAttendingIds.slice(MAX_PLAYERS);
+  
+  // For backward compatibility, keep attendingIds as all attending
+  const attendingIds = allAttendingIds;
+  
+  // Check if current user is on reserve list
+  const isUserReserve = user && reserveIds.includes(user.uid);
+  const isUserConfirmed = user && confirmedIds.includes(user.uid);
 
   const statusLabel = event.booked ? "Booked" : "Proposed";
   const statusColor = event.booked ? "#4ade80" : "#facc15";
@@ -404,39 +419,52 @@ export default function EventPage() {
       {myStatus && (
         <div 
           style={{
-            padding: "10px 16px",
+            padding: "12px 16px",
             marginBottom: 16,
-            borderRadius: 10,
+            borderRadius: 12,
             background: myStatus === "available" 
-              ? "var(--color-success-soft)" 
+              ? isUserReserve 
+                ? "var(--color-warning-soft)" 
+                : "var(--color-success-soft)" 
               : "var(--color-surface-soft)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 12,
+            flexWrap: "wrap",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>
-              {myStatus === "available" ? "✅" : "❌"}
+            <span style={{ fontSize: 20 }}>
+              {myStatus === "available" 
+                ? isUserReserve ? "🔔" : "✅" 
+                : "❌"}
             </span>
-            <span style={{ fontWeight: 500 }}>
-              {myStatus === "available" ? "You're going" : "You declined"}
-            </span>
-            <span style={{ color: "var(--color-text-muted)" }}>
-              • {attendingIds.length} other{attendingIds.length !== 1 ? "s" : ""} going
-            </span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                {myStatus === "available" 
+                  ? isUserReserve 
+                    ? "You're on the reserve list" 
+                    : "You're in!" 
+                  : "You declined"}
+              </div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
+                {isUserReserve 
+                  ? `Position ${reserveIds.indexOf(user.uid) + 1} in queue` 
+                  : `${confirmedIds.length} confirmed${reserveIds.length > 0 ? `, ${reserveIds.length} on reserve` : ""}`}
+              </div>
+            </div>
           </div>
-          {event.booked && myStatus === "available" && (
+          {event.booked && myStatus === "available" && isUserConfirmed && (
             <button
-              className="btn btn-sm btn-ghost"
+              className="btn btn-sm btn-primary"
               onClick={() => {
                 const url = window.location.href;
                 const calUrl = buildGoogleCalendarUrl(event, url);
                 window.open(calUrl, "_blank");
               }}
             >
-              Add to Calendar
+              📅 Add to Calendar
             </button>
           )}
         </div>
@@ -667,30 +695,63 @@ export default function EventPage() {
         {/* RSVP Section - Moved higher for prominence */}
         {!editing && (
           <div style={{ 
-            padding: "14px 16px",
+            padding: "16px",
             marginBottom: 16,
             background: "var(--color-surface-soft)",
-            borderRadius: 10,
+            borderRadius: 12,
           }}>
             {event.booked ? (
               <div style={{ 
                 display: "flex", 
                 alignItems: "center", 
-                gap: 8,
+                gap: 10,
                 color: "var(--color-text-muted)",
               }}>
-                <span>🔒</span>
-                <span>RSVPs closed — this round is booked</span>
+                <span style={{ fontSize: 20 }}>🔒</span>
+                <div>
+                  <div style={{ fontWeight: 500, color: "var(--color-text-main)" }}>RSVPs closed</div>
+                  <div style={{ fontSize: 13 }}>This round is booked</div>
+                </div>
+              </div>
+            ) : myStatus ? (
+              <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+              }}>
+                <div style={{ fontSize: 14, color: "var(--color-text-muted)" }}>
+                  Change your response?
+                </div>
+                <ResponseButtons
+                  currentStatus={myStatus}
+                  onChange={updateResponse}
+                  loading={savingResponse}
+                  compact
+                />
               </div>
             ) : (
               <>
                 <div style={{ 
-                  marginBottom: 10, 
-                  fontSize: 14,
-                  fontWeight: 500,
+                  marginBottom: 12, 
+                  fontSize: 15,
+                  fontWeight: 600,
                 }}>
-                  Are you available?
+                  Are you in? 🏌️
                 </div>
+                {confirmedIds.length >= MAX_PLAYERS && (
+                  <div style={{ 
+                    marginBottom: 12, 
+                    padding: "8px 12px",
+                    background: "var(--color-warning-soft)",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "var(--color-warning)",
+                  }}>
+                    ⚠️ Group is full — you'll be added to the reserve list
+                  </div>
+                )}
                 <ResponseButtons
                   currentStatus={myStatus}
                   onChange={updateResponse}
@@ -838,37 +899,41 @@ export default function EventPage() {
         </div>
       </div>
 
-      {/* PLAYERS CARD - With count indicator */}
+      {/* PLAYERS CARD - Confirmed + Reserves */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">
           <div className="card-title-group">
             <h3 className="card-title">
-              Players ({attendingIds.length}/{MAX_PLAYERS})
+              Players ({confirmedIds.length}/{MAX_PLAYERS})
             </h3>
-            {attendingIds.length >= MAX_PLAYERS ? (
+            {confirmedIds.length >= MAX_PLAYERS ? (
               <p className="card-subtitle" style={{ color: "var(--color-success)" }}>
                 ✓ Group is full
               </p>
             ) : (
               <p className="card-subtitle">
-                {MAX_PLAYERS - attendingIds.length} spot{MAX_PLAYERS - attendingIds.length !== 1 ? "s" : ""} open
+                {MAX_PLAYERS - confirmedIds.length} spot{MAX_PLAYERS - confirmedIds.length !== 1 ? "s" : ""} open
               </p>
             )}
           </div>
         </div>
         <div className="card-body">
-          {attendingIds.length === 0 ? (
-            <p className="text-muted">No one has responded yet. Be the first!</p>
+          {/* Confirmed Players */}
+          {confirmedIds.length === 0 ? (
+            <p className="text-muted" style={{ padding: "8px 0" }}>
+              No one has responded yet. Be the first! 🏌️
+            </p>
           ) : (
-            attendingIds.map((uid, index) => {
+            confirmedIds.map((uid, index) => {
               const u = allUsers.find((x) => x.id === uid);
               const label = u?.username || u?.email?.split("@")[0] || "Unknown";
+              const isYou = uid === user?.uid;
               return (
                 <div
                   key={uid}
                   style={{
-                    padding: "10px 0",
-                    borderBottom: index < attendingIds.length - 1 
+                    padding: "12px 0",
+                    borderBottom: index < confirmedIds.length - 1 || reserveIds.length > 0
                       ? "1px solid var(--color-border-subtle)" 
                       : "none",
                     display: "flex",
@@ -876,29 +941,47 @@ export default function EventPage() {
                     alignItems: "center",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{
-                      width: 32,
-                      height: 32,
+                      width: 36,
+                      height: 36,
                       borderRadius: "50%",
-                      background: "var(--color-primary-soft)",
+                      background: isYou ? "var(--color-primary)" : "var(--color-primary-soft)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontWeight: 600,
                       fontSize: 14,
-                      color: "var(--color-primary)",
+                      color: isYou ? "#fff" : "var(--color-primary)",
                     }}>
                       {label.charAt(0).toUpperCase()}
                     </div>
-                    <span style={{ fontWeight: 500 }}>{label}</span>
+                    <div>
+                      <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                        {label}
+                        {isYou && (
+                          <span style={{ 
+                            fontSize: 11, 
+                            background: "var(--color-primary)", 
+                            color: "#fff", 
+                            padding: "2px 6px", 
+                            borderRadius: 4,
+                          }}>
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        Confirmed
+                      </div>
+                    </div>
                   </div>
 
                   {isAdmin && (
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => removePlayer(uid)}
-                      style={{ color: "var(--color-text-muted)" }}
+                      style={{ color: "var(--color-text-muted)", fontSize: 12 }}
                     >
                       Remove
                     </button>
@@ -906,6 +989,97 @@ export default function EventPage() {
                 </div>
               );
             })
+          )}
+
+          {/* Reserves Section */}
+          {reserveIds.length > 0 && (
+            <>
+              <div style={{ 
+                padding: "12px 0 8px", 
+                display: "flex", 
+                alignItems: "center", 
+                gap: 8,
+              }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-muted)" }}>
+                  🔔 Reserve List
+                </span>
+                <span style={{ 
+                  fontSize: 11, 
+                  background: "var(--color-warning-soft)", 
+                  color: "var(--color-warning)", 
+                  padding: "2px 8px", 
+                  borderRadius: 10,
+                }}>
+                  {reserveIds.length} waiting
+                </span>
+              </div>
+              {reserveIds.map((uid, index) => {
+                const u = allUsers.find((x) => x.id === uid);
+                const label = u?.username || u?.email?.split("@")[0] || "Unknown";
+                const isYou = uid === user?.uid;
+                return (
+                  <div
+                    key={uid}
+                    style={{
+                      padding: "10px 0",
+                      borderBottom: index < reserveIds.length - 1 
+                        ? "1px solid var(--color-border-subtle)" 
+                        : "none",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      opacity: 0.8,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        background: "var(--color-warning-soft)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: "var(--color-warning)",
+                      }}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                          {label}
+                          {isYou && (
+                            <span style={{ 
+                              fontSize: 11, 
+                              background: "var(--color-warning)", 
+                              color: "#fff", 
+                              padding: "2px 6px", 
+                              borderRadius: 4,
+                            }}>
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                          Reserve #{index + 1}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isAdmin && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => removePlayer(uid)}
+                        style={{ color: "var(--color-text-muted)", fontSize: 12 }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
