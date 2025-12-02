@@ -775,3 +775,309 @@ textarea::placeholder {
 .event-right button {
   width: 100%;
 }
+/* EVENT PAGE WRAPPER */
+.event-page-wrapper {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* TOP SECTION → Image + Details aligned horizontally */
+.event-top-section {
+  display: flex;
+  gap: 24px;
+}
+
+@media (max-width: 850px) {
+  .event-top-section {
+    flex-direction: column;
+  }
+}
+
+/* LEFT COLUMN (image + conditions) */
+.event-left-column {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 850px) {
+  .event-left-column {
+    width: 100%;
+  }
+}
+
+/* MAIN DETAILS COLUMN */
+.event-main-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* BUTTON BAR BELOW MAIN CARD */
+.event-action-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* SECTION CARDS */
+.event-section-card {
+  padding: 20px;
+  background: var(--color-surface);
+  border-radius: 16px;
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-soft);
+}
+
+/* TITLES */
+.event-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* =========================================================
+   EVENT PAGE - RESPONSIVE LAYOUT
+   ========================================================= */
+
+.event-card {
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .event-card {
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+}
+
+/* Mobile action buttons - shown on mobile, hidden on desktop */
+.event-actions-mobile {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.event-actions-mobile .btn {
+  flex: 1;
+  min-width: 80px;
+}
+
+@media (min-width: 900px) {
+  .event-actions-mobile {
+    display: none;
+  }
+}
+
+/* Desktop action buttons - hidden on mobile, shown on desktop */
+.event-actions-desktop {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .event-actions-desktop {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+    min-width: 180px;
+  }
+}
+
+/* Event header */
+.event-header {
+  margin-bottom: 16px;
+}
+
+.event-title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+@media (min-width: 480px) {
+  .event-title-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+.event-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+  .event-title {
+    font-size: 28px;
+  }
+}
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #111827;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #111827;
+}
+
+.event-date {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* Main content grid */
+.event-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .event-grid {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr) 200px;
+    gap: 28px;
+    align-items: flex-start;
+  }
+}
+
+/* Media section (image + conditions) */
+.event-media {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 480px) and (max-width: 899px) {
+  .event-media {
+    flex-direction: row;
+    gap: 16px;
+  }
+  
+  .event-image-wrapper {
+    flex: 1;
+    max-width: 50%;
+  }
+  
+  .event-conditions-wrapper {
+    flex: 1;
+  }
+}
+
+.event-image-wrapper {
+  width: 100%;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface-soft);
+}
+
+@media (min-width: 480px) and (max-width: 899px) {
+  .event-image-wrapper {
+    height: 200px;
+  }
+}
+
+/* Event details section */
+.event-details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 15px;
+  color: var(--color-text-main);
+}
+
+.detail-secondary {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* Forecast card responsive */
+.forecast-card {
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .forecast-card {
+    padding: 20px;
+  }
+}
+
+/* Player list responsive */
+.player-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-item:last-child {
+  border-bottom: none;
+}
+
+/* RSVP section */
+.rsvp-section {
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .rsvp-section {
+    padding: 20px;
+  }
+}
+
+/* Response buttons grid on mobile */
+@media (max-width: 479px) {
+  .response-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  
+  .response-buttons .btn {
+    width: 100%;
+  }
+}

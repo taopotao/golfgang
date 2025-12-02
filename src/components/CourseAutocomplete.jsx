@@ -1,29 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 
-const GOOGLE_MAPS_URL = `https://maps.googleapis.com/maps/api/js?key=${
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-}&libraries=places`;
-
-let scriptLoadingPromise = null;
-
-function loadGoogleMapsScript() {
-  if (scriptLoadingPromise) return scriptLoadingPromise;
-
-  scriptLoadingPromise = new Promise((resolve, reject) => {
+/**
+ * Wait for Google Maps to be loaded (from index.html script tag)
+ */
+function waitForGoogleMaps(timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    // Check if already loaded
     if (window.google && window.google.maps && window.google.maps.places) {
       resolve();
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = GOOGLE_MAPS_URL;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = reject;
-    document.head.appendChild(script);
+    // Poll for it to be ready
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        clearInterval(interval);
+        resolve();
+      } else if (Date.now() - startTime > timeout) {
+        clearInterval(interval);
+        reject(new Error("Google Maps failed to load within timeout"));
+      }
+    }, 100);
   });
-
-  return scriptLoadingPromise;
 }
 
 /**
@@ -34,11 +33,12 @@ function loadGoogleMapsScript() {
 export default function CourseAutocomplete({ onSelect, initialValue = "" }) {
   const inputRef = useRef(null);
   const [value, setValue] = useState(initialValue);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let autocomplete;
 
-    loadGoogleMapsScript()
+    waitForGoogleMaps()
       .then(() => {
         if (!inputRef.current) return;
 
@@ -52,6 +52,8 @@ export default function CourseAutocomplete({ onSelect, initialValue = "" }) {
 
         autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
+          console.log("Place selected:", place); // Debug log
+          
           if (!place || !place.place_id) return;
 
           let photoUrl = "";
@@ -60,6 +62,9 @@ export default function CourseAutocomplete({ onSelect, initialValue = "" }) {
               maxWidth: 1000,
               maxHeight: 600,
             });
+            console.log("Photo URL:", photoUrl); // Debug log
+          } else {
+            console.log("No photos available for this place"); // Debug log
           }
 
           const payload = {
@@ -68,28 +73,41 @@ export default function CourseAutocomplete({ onSelect, initialValue = "" }) {
             placeId: place.place_id,
             photoUrl,
           };
+          
+          console.log("Payload being sent:", payload); // Debug log
 
           setValue(payload.name);
           onSelect?.(payload);
         });
+
+        setError(null);
       })
       .catch((err) => {
-        console.error("Error loading Google Maps script", err);
+        console.error("Error loading Google Maps:", err);
+        setError("Google Maps failed to load. Please refresh the page.");
       });
 
     return () => {
-      // nothing to clean up; autocomplete is attached to input lifecycle
+      // Cleanup: Google Autocomplete doesn't have a destroy method,
+      // but it will be garbage collected when input is removed
     };
   }, [onSelect]);
 
   return (
-    <input
-  ref={inputRef}
-  className="input"
-  style={{ width: "100%" }}   // ❤️ THIS FIXES EVERYTHING
-  placeholder="Search golf course"
-  value={value}
-  onChange={(e) => setValue(e.target.value)}
-/>
+    <>
+      <input
+        ref={inputRef}
+        className="input"
+        style={{ width: "100%" }}
+        placeholder="Search golf course"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      {error && (
+        <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 4 }}>
+          {error}
+        </p>
+      )}
+    </>
   );
 }

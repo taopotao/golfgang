@@ -145,6 +145,7 @@ export default function Profile() {
                 className="input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                style={{ width: "100%" }}
               />
               <small>
                 Use lowercase letters, numbers, and underscores only.
@@ -170,6 +171,7 @@ export default function Profile() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -184,6 +186,7 @@ export default function Profile() {
                 type="password"
                 value={currentPass}
                 onChange={(e) => setCurrentPass(e.target.value)}
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -213,6 +216,7 @@ export default function Profile() {
                 type="password"
                 value={currentPass}
                 onChange={(e) => setCurrentPass(e.target.value)}
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -223,6 +227,7 @@ export default function Profile() {
                 type="password"
                 value={newPass}
                 onChange={(e) => setNewPass(e.target.value)}
+                style={{ width: "100%" }}
               />
             </div>
 

@@ -1,28 +1,106 @@
 import { useEffect, useState } from "react";
 import { getLatLngWithJS, getWeather } from "../utils/weather";
 
+// Get a human-readable condition summary
+function getConditionSummary(score, temp, rain, wind) {
+  let icon = "⛳";
+  let label = "Good";
+  
+  if (score >= 8) {
+    icon = "☀️";
+    label = "Great conditions!";
+  } else if (score >= 6) {
+    icon = "⛅";
+    label = "Good conditions";
+  } else if (score >= 4) {
+    icon = "🌥️";
+    label = "Fair conditions";
+  } else {
+    icon = "🌧️";
+    label = "Challenging conditions";
+  }
+  
+  // Add specific warnings
+  const warnings = [];
+  if (rain > 50) warnings.push("rain likely");
+  if (wind > 25) warnings.push("windy");
+  if (temp > 35) warnings.push("hot");
+  if (temp < 10) warnings.push("cold");
+  
+  return { icon, label, warnings };
+}
+
 export default function GolfConditions({ placeId, date, tee }) {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (!placeId) return;
+
     async function load() {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      const coords = await getLatLngWithJS(placeId);
-      if (!coords) return;
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const coords = await getLatLngWithJS(placeId);
+        if (!coords) {
+          setError("Could not get course location");
+          return;
+        }
 
-      const weather = await getWeather(coords.lat, coords.lng);
+        const weather = await getWeather(coords.lat, coords.lng);
 
-      // determine tee-time index (hour of day)
-      let idx = null;
-      if (tee) {
-        const [h, m] = tee.split(":").map(Number);
-        idx = h; // hour index
+        // determine tee-time index (hour of day)
+        let idx = null;
+        if (tee) {
+          const [h] = tee.split(":").map(Number);
+          idx = h; // hour index
+        }
+
+        setData({ coords, weather, idx });
+      } catch (err) {
+        console.error("Failed to load golf conditions:", err);
+        setError("Could not load conditions");
+      } finally {
+        setLoading(false);
       }
-
-      setData({ coords, weather, idx });
     }
     load();
   }, [placeId, tee, date]);
+
+  if (!placeId) return null;
+
+  const containerStyle = {
+    padding: "10px 12px",
+    background: "var(--color-surface-soft)",
+    borderRadius: 10,
+    width: "100%",
+    boxSizing: "border-box",
+    cursor: "pointer",
+    transition: "background 0.15s ease",
+  };
+
+  if (loading) {
+    return (
+      <div style={containerStyle}>
+        <p style={{ color: "var(--color-text-muted)", margin: 0, fontSize: 13 }}>
+          Loading weather...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={containerStyle}>
+        <p style={{ color: "var(--color-text-muted)", margin: 0, fontSize: 13 }}>
+          {error}
+        </p>
+      </div>
+    );
+  }
 
   if (!data) return null;
 
@@ -31,9 +109,9 @@ export default function GolfConditions({ placeId, date, tee }) {
   // fallback if tee missing
   const t = idx ?? 9;
 
-  const temp = weather.hourly.temperature_2m[t];
+  const temp = Math.round(weather.hourly.temperature_2m[t]);
   const rain = weather.hourly.precipitation_probability[t];
-  const wind = weather.hourly.windspeed_10m[t];
+  const wind = Math.round(weather.hourly.windspeed_10m[t]);
   const cloud = weather.hourly.cloudcover[t];
 
   // score calculation
@@ -41,48 +119,81 @@ export default function GolfConditions({ placeId, date, tee }) {
     10 -
     (Math.abs(temp - 22) * 0.1 + rain * 0.05 + wind * 0.05 + cloud * 0.01);
 
-  const cleanScore = Math.max(0, Math.min(10, score)).toFixed(1);
+  const cleanScore = Math.max(0, Math.min(10, score));
+  const { icon, label, warnings } = getConditionSummary(cleanScore, temp, rain, wind);
 
   return (
-  <div
-    style={{
-      marginTop: "0px",
-      padding: "12px 14px",
-      background: "var(--color-surface-soft)",
-      borderRadius: 12,
-      width: "100%",
-      boxSizing: "border-box",
-    }}
-  >
-    <h4 style={{ margin: "0 0 4px 0", fontSize: 15, fontWeight: 600 }}>
-      Golf Conditions
-    </h4>
-
-    <div
-      style={{
-        fontSize: 12,
-        color: "var(--text-muted)",
-        marginBottom: 8,
-      }}
+    <div 
+      style={containerStyle}
+      onClick={() => setExpanded(!expanded)}
     >
-      {/* adjust this based on how date is stored */}
-      {date?.toDate
-        ? date.toDate().toLocaleDateString("en-AU", {
-            weekday: "long",
-            day: "numeric",
-            month: "short",
-          })
-        : "Event date"}{" "}
-      {tee && `· Tee time ${tee}`}
-    </div>
+      {/* Summary line */}
+      <div style={{ 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "space-between",
+        gap: 8,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>{icon}</span>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
+            <span style={{ fontSize: 13, color: "var(--color-text-muted)", marginLeft: 8 }}>
+              {temp}°C • {wind} km/h wind
+            </span>
+          </div>
+        </div>
+        <span style={{ 
+          fontSize: 12, 
+          color: "var(--color-text-muted)",
+          transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 0.2s ease",
+        }}>
+          ▼
+        </span>
+      </div>
 
-    <div style={{ fontSize: 13, lineHeight: 1.4 }}>
-      <div><strong>Score:</strong> {cleanScore} / 10</div>
-      <div><strong>Temp:</strong> {temp}°C</div>
-      <div><strong>Rain:</strong> {rain}%</div>
-      <div><strong>Wind:</strong> {wind} km/h</div>
-      <div><strong>Cloud:</strong> {cloud}%</div>
+      {/* Warnings */}
+      {warnings.length > 0 && (
+        <div style={{ 
+          fontSize: 12, 
+          color: "var(--color-danger)", 
+          marginTop: 4,
+          marginLeft: 26,
+        }}>
+          ⚠️ {warnings.join(", ")}
+        </div>
+      )}
+
+      {/* Expanded details */}
+      {expanded && (
+        <div style={{ 
+          marginTop: 12, 
+          paddingTop: 12, 
+          borderTop: "1px solid var(--color-border-subtle)",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "8px 16px",
+          fontSize: 13,
+        }}>
+          <div>
+            <span style={{ color: "var(--color-text-muted)" }}>Temperature</span>
+            <div style={{ fontWeight: 500 }}>{temp}°C</div>
+          </div>
+          <div>
+            <span style={{ color: "var(--color-text-muted)" }}>Rain chance</span>
+            <div style={{ fontWeight: 500 }}>{rain}%</div>
+          </div>
+          <div>
+            <span style={{ color: "var(--color-text-muted)" }}>Wind</span>
+            <div style={{ fontWeight: 500 }}>{wind} km/h</div>
+          </div>
+          <div>
+            <span style={{ color: "var(--color-text-muted)" }}>Cloud cover</span>
+            <div style={{ fontWeight: 500 }}>{cloud}%</div>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
 }

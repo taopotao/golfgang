@@ -235,6 +235,10 @@ export default function Dashboard() {
   .sort((a, b) => a.date.toMillis() - b.date.toMillis())
   .map((ev) => {
     const dateObj = ev.date.toDate();
+    const myStatus = user && ev.responses ? ev.responses[user.uid] : null;
+    const attendingCount = ev.responses 
+      ? Object.values(ev.responses).filter(s => s === 'available').length 
+      : 0;
 
     return (
       <Link
@@ -244,6 +248,7 @@ export default function Dashboard() {
         style={{
           padding: "14px",
           textDecoration: "none",
+          borderLeft: myStatus === 'available' ? '3px solid var(--color-success)' : 'none',
         }}
       >
 
@@ -267,21 +272,45 @@ export default function Dashboard() {
           </span>
         </div>
 
-        {/* Date */}
+        {/* Date + Time */}
         <p className="text-muted" style={{ margin: "4px 0" }}>
           {dateObj.toLocaleDateString("en-AU", {
             weekday: "long",
             month: "long",
             day: "numeric",
           })}
+          {ev.tee && ` • ${ev.tee}`}
         </p>
 
         {/* Course */}
         {ev.courseName && (
-          <p style={{ margin: 0, fontSize: "14px" }}>
-            <strong>{ev.courseName}</strong>
+          <p style={{ margin: "4px 0 0", fontSize: "14px" }}>
+            📍 {ev.courseName}
           </p>
         )}
+
+        {/* Player count + your status */}
+        <div style={{ 
+          marginTop: 8, 
+          display: "flex", 
+          alignItems: "center", 
+          gap: 12,
+          fontSize: 13,
+        }}>
+          <span style={{ color: "var(--color-text-muted)" }}>
+            👥 {attendingCount}/4
+          </span>
+          {myStatus === 'available' && (
+            <span style={{ color: "var(--color-success)", fontWeight: 500 }}>
+              ✓ You're in
+            </span>
+          )}
+          {!myStatus && !ev.booked && (
+            <span style={{ color: "var(--color-primary)", fontWeight: 500 }}>
+              Awaiting response
+            </span>
+          )}
+        </div>
       </Link>
     );
   })}

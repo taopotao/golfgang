@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import EventPage from './pages/EventPage'
+import EventPage from "./pages/event/EventPage";
 import Admin from './pages/Admin'
 import NotFound from './pages/NotFound'
 import { RequireAuth, RequireAdmin } from './components/RouteGuards'
