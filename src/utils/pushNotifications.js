@@ -49,8 +49,10 @@ export const requestNotificationPermission = async (userId) => {
     }
 
     // Register service worker
-    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    console.log('Service worker registered:', registration);
+    const basePath = '/golfgang'; // or use your build tool's base path config
+    const registration = await navigator.serviceWorker.register(`${basePath}/firebase-messaging-sw.js`, { 
+  scope: `${basePath}/` 
+});
 
     // Get FCM token
     if (!messaging) {
