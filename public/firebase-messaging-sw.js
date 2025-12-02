@@ -25,8 +25,6 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title || 'GolfGang';
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new notification',
-    icon: '/logo192.png',
-    badge: '/logo192.png',
     tag: payload.data?.eventId || 'golfgang-notification',
     data: payload.data,
     actions: [
