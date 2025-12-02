@@ -8,7 +8,7 @@ function getConditionSummary(score, temp, rain, wind) {
   
   if (score >= 8) {
     icon = "☀️";
-    label = "Great conditions!";
+    label = "Great conditions";
   } else if (score >= 6) {
     icon = "⛅";
     label = "Good conditions";
@@ -17,7 +17,7 @@ function getConditionSummary(score, temp, rain, wind) {
     label = "Fair conditions";
   } else {
     icon = "🌧️";
-    label = "Challenging conditions";
+    label = "Challenging";
   }
   
   // Add specific warnings
@@ -35,6 +35,15 @@ export default function GolfConditions({ placeId, date, tee }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+
+  // Format the event date for display
+  const eventDateStr = date?.toDate 
+    ? date.toDate().toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      })
+    : null;
 
   useEffect(() => {
     if (!placeId) return;
@@ -73,7 +82,7 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (!placeId) return null;
 
   const containerStyle = {
-    padding: "10px 12px",
+    padding: "12px 14px",
     background: "var(--color-surface-soft)",
     borderRadius: 10,
     width: "100%",
@@ -85,9 +94,9 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (loading) {
     return (
       <div style={containerStyle}>
-        <p style={{ color: "var(--color-text-muted)", margin: 0, fontSize: 13 }}>
-          Loading weather...
-        </p>
+        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          Loading weather for {eventDateStr || "event day"}...
+        </div>
       </div>
     );
   }
@@ -95,9 +104,9 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (error) {
     return (
       <div style={containerStyle}>
-        <p style={{ color: "var(--color-text-muted)", margin: 0, fontSize: 13 }}>
+        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
           {error}
-        </p>
+        </div>
       </div>
     );
   }
@@ -127,6 +136,17 @@ export default function GolfConditions({ placeId, date, tee }) {
       style={containerStyle}
       onClick={() => setExpanded(!expanded)}
     >
+      {/* Header showing this is for event day */}
+      <div style={{ 
+        fontSize: 11, 
+        color: "var(--color-text-muted)", 
+        marginBottom: 6,
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+      }}>
+        Weather for {eventDateStr || "event day"} {tee && `@ ${tee}`}
+      </div>
+
       {/* Summary line */}
       <div style={{ 
         display: "flex", 
@@ -135,11 +155,11 @@ export default function GolfConditions({ placeId, date, tee }) {
         gap: 8,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>{icon}</span>
+          <span style={{ fontSize: 20 }}>{icon}</span>
           <div>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
             <span style={{ fontSize: 13, color: "var(--color-text-muted)", marginLeft: 8 }}>
-              {temp}°C • {wind} km/h wind
+              {temp}°C • {wind} km/h
             </span>
           </div>
         </div>
@@ -158,8 +178,7 @@ export default function GolfConditions({ placeId, date, tee }) {
         <div style={{ 
           fontSize: 12, 
           color: "var(--color-danger)", 
-          marginTop: 4,
-          marginLeft: 26,
+          marginTop: 6,
         }}>
           ⚠️ {warnings.join(", ")}
         </div>

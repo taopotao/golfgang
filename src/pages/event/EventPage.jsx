@@ -16,7 +16,6 @@ import ResponseButtons from "../../components/ResponseButtons";
 import CourseAutocomplete from "../../components/CourseAutocomplete";
 import CourseMiniMap from "../../components/CourseMiniMap";
 import GolfConditions from "../../components/GolfConditions";
-import Forecast3Day from "../../components/Forecast3Day";
 import PlacePhoto from "../../components/PlacePhoto";
 
 // Build Google Calendar URL
@@ -909,11 +908,6 @@ export default function EventPage() {
             })
           )}
         </div>
-      </div>
-
-      {/* 3-DAY FORECAST */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <Forecast3Day placeId={event.coursePlaceId} />
       </div>
 
       {/* MAP */}

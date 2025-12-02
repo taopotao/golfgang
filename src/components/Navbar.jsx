@@ -18,136 +18,266 @@ export default function Navbar() {
     navigate("/login");
   };
 
-  const isDashboard = location.pathname === "/";
-  const isAdminRoute = location.pathname.startsWith("/admin");
+  const closeMenu = () => setMobileMenuOpen(false);
 
   return (
-  <header className="top-nav">
-    <div className="top-nav-inner">
+    <>
+      <header className="top-nav">
+        <div className="top-nav-inner">
+          {/* LEFT — Brand */}
+          <Link to="/" className="top-nav-left" style={{ textDecoration: 'none' }}>
+            <div className="brand-mark" />
+            <div className="brand-title">
+              <span className="brand-title-main">GolfGang</span>
+              <span className="brand-title-sub">Tee Time Planner</span>
+            </div>
+          </Link>
 
-      {/* LEFT — Brand */}
-      <div className="top-nav-left">
-        <div className="brand-mark" />
-        <div className="brand-title">
-          <span className="brand-title-main">GolfGang</span>
-          <span className="brand-title-sub">Tee Time Planner</span>
+          {/* RIGHT — Desktop menu */}
+          <div className="top-nav-right desktop-only nav-desktop">
+            {user && (
+              <>
+                <nav className="top-nav-links">
+                  <Link to="/" className={location.pathname === "/" ? "active" : undefined}>
+                    Calendar
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      className={location.pathname.startsWith("/admin") ? "active" : undefined}
+                    >
+                      Admin
+                    </Link>
+                  )}
+                </nav>
+
+                <button onClick={toggleTheme} className="theme-toggle-btn">
+                  <div
+                    className="theme-toggle-thumb"
+                    style={{ left: theme === "dark" ? 30 : 3 }}
+                  />
+                  <span>☀️</span>
+                  <span>🌙</span>
+                </button>
+
+                <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm">
+                  Profile
+                </button>
+
+                <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+                  Logout
+                </button>
+              </>
+            )}
+
+            {!user && (
+              <Link to="/login" className="btn btn-primary btn-sm">
+                Login
+              </Link>
+            )}
+          </div>
+
+          {/* MOBILE HAMBURGER BUTTON */}
+          {user && (
+            <button
+              className="mobile-only"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 8,
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 5,
+              }}
+              aria-label="Menu"
+            >
+              <span style={{
+                display: 'block',
+                width: 22,
+                height: 2,
+                background: 'var(--color-text-main)',
+                borderRadius: 2,
+                transition: 'all 0.2s ease',
+                transform: mobileMenuOpen ? 'rotate(45deg) translateY(7px)' : 'none',
+              }} />
+              <span style={{
+                display: 'block',
+                width: 22,
+                height: 2,
+                background: 'var(--color-text-main)',
+                borderRadius: 2,
+                transition: 'all 0.2s ease',
+                opacity: mobileMenuOpen ? 0 : 1,
+              }} />
+              <span style={{
+                display: 'block',
+                width: 22,
+                height: 2,
+                background: 'var(--color-text-main)',
+                borderRadius: 2,
+                transition: 'all 0.2s ease',
+                transform: mobileMenuOpen ? 'rotate(-45deg) translateY(-7px)' : 'none',
+              }} />
+            </button>
+          )}
         </div>
-      </div>
+      </header>
 
-      {/* RIGHT — Desktop menu */}
-      <div className="top-nav-right desktop-only nav-desktop">
-        {user && (
-          <>
-            <nav className="top-nav-links">
-              <Link to="/" className={location.pathname === "/" ? "active" : undefined}>
-                Calendar
+      {/* MOBILE MENU - Full screen overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="mobile-only"
+          style={{
+            position: 'fixed',
+            top: 'var(--nav-height)',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'var(--color-bg)',
+            zIndex: 100,
+            padding: 20,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            overflowY: 'auto',
+          }}
+        >
+          {user && (
+            <>
+              {/* User info */}
+              <div style={{
+                padding: '16px 0',
+                borderBottom: '1px solid var(--color-border-subtle)',
+                marginBottom: 8,
+              }}>
+                <div style={{ fontWeight: 600, fontSize: 16 }}>
+                  {user.email?.split('@')[0]}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+                  {user.email}
+                  {isAdmin && ' • Admin'}
+                </div>
+              </div>
+
+              {/* Navigation links */}
+              <Link 
+                to="/" 
+                onClick={closeMenu}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 0',
+                  textDecoration: 'none',
+                  color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text-main)',
+                  fontSize: 16,
+                  fontWeight: 500,
+                }}
+              >
+                📅 Calendar
+              </Link>
+
+              <Link 
+                to="/profile" 
+                onClick={closeMenu}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 0',
+                  textDecoration: 'none',
+                  color: location.pathname === '/profile' ? 'var(--color-primary)' : 'var(--color-text-main)',
+                  fontSize: 16,
+                  fontWeight: 500,
+                }}
+              >
+                👤 Profile
               </Link>
 
               {isAdmin && (
-                <Link
-                  to="/admin"
-                  className={location.pathname.startsWith("/admin") ? "active" : undefined}
+                <Link 
+                  to="/admin" 
+                  onClick={closeMenu}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px 0',
+                    textDecoration: 'none',
+                    color: location.pathname.startsWith('/admin') ? 'var(--color-primary)' : 'var(--color-text-main)',
+                    fontSize: 16,
+                    fontWeight: 500,
+                  }}
                 >
-                  Admin
+                  ⚙️ Admin
                 </Link>
               )}
-            </nav>
 
-            <button onClick={toggleTheme} className="theme-toggle-btn">
-              <div
-                className="theme-toggle-thumb"
+              {/* Theme toggle */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 0',
+                borderTop: '1px solid var(--color-border-subtle)',
+                marginTop: 8,
+              }}>
+                <span style={{ fontSize: 16, fontWeight: 500 }}>
+                  {theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+                </span>
+                <button 
+                  onClick={toggleTheme}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'var(--color-surface-soft)',
+                    border: '1px solid var(--color-border-subtle)',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    color: 'var(--color-text-main)',
+                  }}
+                >
+                  Switch
+                </button>
+              </div>
+
+              {/* Logout */}
+              <button 
+                onClick={() => { handleLogout(); closeMenu(); }}
                 style={{
-                  left: theme === "dark" ? 30 : 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 0',
+                  background: 'none',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  color: 'var(--color-danger)',
+                  fontSize: 16,
+                  fontWeight: 500,
+                  width: '100%',
                 }}
-              />
-              <span>☀️</span>
-              <span>🌙</span>
-            </button>
+              >
+                🚪 Logout
+              </button>
+            </>
+          )}
 
-            <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm">
-              Profile
-            </button>
-
-            <span className="user-email">
-              {user.email}
-              {isAdmin && " · admin"}
-            </span>
-
-            <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
-              Logout
-            </button>
-          </>
-        )}
-
-        {!user && (
-          <Link to="/login" className="btn btn-primary btn-sm">
-            Login
-          </Link>
-        )}
-      </div>
-
-      {/* MOBILE HAMBURGER BUTTON */}
-      <button
-        className="nav-hamburger mobile-only"
-        onClick={() => setMobileMenuOpen((x) => !x)}
-      >
-        ☰
-      </button>
-    </div>
-
-    {/* MOBILE MENU */}
-    {mobileMenuOpen && (
-      <div className="mobile-menu mobile-only">
-        {user && (
-          <>
-            <Link to="/" onClick={() => setMobileMenuOpen(false)}>
-              Calendar
-            </Link>
-
-            {isAdmin && (
-              <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
-                Admin
-              </Link>
-            )}
-
-            <button onClick={toggleTheme} className="theme-toggle-btn">
-              <div
-                className="theme-toggle-thumb"
-                style={{
-                  left: theme === "dark" ? 30 : 3,
-                }}
-              />
-              <span>☀️</span>
-              <span>🌙</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                navigate("/profile");
-              }}
-              className="btn btn-ghost btn-sm"
+          {!user && (
+            <Link
+              to="/login"
+              className="btn btn-primary"
+              onClick={closeMenu}
+              style={{ marginTop: 20 }}
             >
-              Profile
-            </button>
-
-            <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
-              Logout
-            </button>
-          </>
-        )}
-
-        {!user && (
-          <Link
-            to="/login"
-            className="btn btn-primary btn-sm"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Login
-          </Link>
-        )}
-      </div>
-    )}
-  </header>
-);
+              Login
+            </Link>
+          )}
+        </div>
+      )}
+    </>
+  );
 }

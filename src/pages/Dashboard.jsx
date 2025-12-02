@@ -61,7 +61,22 @@ export default function Dashboard() {
   };
 
   const openCreateModal = (day) => {
-    setSelectedDay(new Date(currentYear, currentMonth, day));
+    const date = new Date(currentYear, currentMonth, day);
+    setSelectedDay(date);
+    
+    // Auto-generate title like "⛳ Saturday 6th December"
+    const dayOfWeek = date.toLocaleDateString("en-AU", { weekday: "long" });
+    const dayNum = date.getDate();
+    const month = date.toLocaleDateString("en-AU", { month: "long" });
+    
+    // Add ordinal suffix (1st, 2nd, 3rd, etc.)
+    const ordinal = (n) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+    
+    setTitle(`⛳ ${dayOfWeek} ${ordinal(dayNum)} ${month}`);
     setShowModal(true);
   };
 
@@ -130,7 +145,7 @@ export default function Dashboard() {
       </div>
 
       {/* ---------- CALENDAR CARD ---------- */}
-      <div className="card" style={{ marginBottom: "2rem" }}>
+      <div className="card" style={{ marginBottom: "2rem", overflow: "hidden" }}>
         <div className="card-header">
           <div className="card-title-group">
             <h3 className="card-title">
@@ -142,7 +157,7 @@ export default function Dashboard() {
             <p className="card-subtitle">Tap a date to create an event</p>
           </div>
 
-          <div className="flex gap-2">
+          <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-ghost btn-sm" onClick={prevMonth}>‹</button>
             <button className="btn btn-ghost btn-sm" onClick={nextMonth}>›</button>
           </div>
@@ -150,18 +165,17 @@ export default function Dashboard() {
 
         {/* Weekday headers */}
         <div
-          className="grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
-            fontSize: "13px",
+            fontSize: "12px",
             marginBottom: "8px",
             opacity: 0.7,
             textAlign: "center",
           }}
         >
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div key={d}>{d}</div>
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <div key={i}>{d}</div>
           ))}
         </div>
 
@@ -170,7 +184,7 @@ export default function Dashboard() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
-            gap: "10px",
+            gap: "4px",
           }}
         >
           {Array.from({ length: startDay }).map((_, i) => (
@@ -182,38 +196,79 @@ export default function Dashboard() {
             const dateObj = new Date(currentYear, currentMonth, day);
             const key = dateObj.toISOString().split("T")[0];
             const dayEvents = eventsByDay[key] || [];
+            const isToday = 
+              today.getDate() === day && 
+              today.getMonth() === currentMonth && 
+              today.getFullYear() === currentYear;
 
             return (
               <div
                 key={day}
                 onClick={() => isAdmin && openCreateModal(day)}
                 style={{
-                  padding: "12px",
-                  borderRadius: "var(--radius-m)",
+                  padding: "8px 4px",
+                  borderRadius: 8,
                   background: dayEvents.length
-                    ? "var(--color-surface-soft)"
-                    : "var(--color-surface)",
-                  border: "1px solid var(--color-border-subtle)",
+                    ? dayEvents.some(ev => ev.booked) 
+                      ? "var(--color-success-soft)" 
+                      : "var(--color-primary-soft)"
+                    : "transparent",
+                  border: isToday 
+                    ? "2px solid var(--color-primary)" 
+                    : "1px solid var(--color-border-subtle)",
                   cursor: isAdmin ? "pointer" : "default",
                   textAlign: "center",
+                  minHeight: 44,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
                 }}
               >
-                <div style={{ fontSize: "15px", fontWeight: 500 }}>{day}</div>
+                <div style={{ 
+                  fontSize: "14px", 
+                  fontWeight: isToday ? 700 : 500,
+                  color: isToday ? "var(--color-primary)" : "inherit",
+                }}>
+                  {day}
+                </div>
 
                 {dayEvents.length > 0 && (
-  <div
-    className={`calendar-day-badge ${
-      dayEvents.some(ev => ev.booked) 
-        ? "calendar-badge-booked"
-        : "calendar-badge-proposed"
-    }`}
-  >
-    {dayEvents.some(ev => ev.booked) ? "Booked" : "Proposed"}
-  </div>
-)}
+                  <div
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: dayEvents.some(ev => ev.booked) 
+                        ? "var(--color-success)" 
+                        : "var(--color-primary)",
+                    }}
+                  />
+                )}
               </div>
             );
           })}
+        </div>
+
+        {/* Legend */}
+        <div style={{ 
+          display: "flex", 
+          gap: 16, 
+          marginTop: 12, 
+          paddingTop: 12,
+          borderTop: "1px solid var(--color-border-subtle)",
+          fontSize: 12,
+          color: "var(--color-text-muted)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-primary)" }} />
+            <span>Proposed</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-success)" }} />
+            <span>Booked</span>
+          </div>
         </div>
       </div>
 
