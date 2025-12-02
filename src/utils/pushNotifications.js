@@ -127,7 +127,6 @@ export const onForegroundMessage = (callback) => {
       const { title, body } = payload.notification || {};
       new Notification(title || 'GolfGang', {
         body: body || 'You have a new notification',
-        icon: '/logo192.png',
         tag: payload.data?.eventId || 'golfgang-foreground'
       });
     }
@@ -139,7 +138,6 @@ export const sendTestNotification = () => {
   if (Notification.permission === 'granted') {
     new Notification('🏌️ GolfGang Test', {
       body: 'Push notifications are working! 🎉',
-      icon: '/logo192.png'
     });
   }
 };
