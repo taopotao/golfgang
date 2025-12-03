@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../providers/AuthProvider";
-import { db } from "../../firebase";
+import { db, app } from "../../firebase";
 import {
   doc,
   getDoc,
@@ -11,23 +11,20 @@ import {
   getDocs,
   Timestamp,
 } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
-import ResponseButtons from "../../components/ResponseButtons";
 import CourseAutocomplete from "../../components/CourseAutocomplete";
-import CourseMiniMap from "../../components/CourseMiniMap";
-import GolfConditions from "../../components/GolfConditions";
 import PlacePhoto from "../../components/PlacePhoto";
+import GolfConditions from "../../components/GolfConditions";
 
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
   if (!event) return "";
-
   const date = event.date?.toDate ? event.date.toDate() : null;
   const teeTime = event.tee || "";
   const courseName = event.courseName || "";
   const notes = event.notes || "";
 
-  // parse tee time "14:30" to hours / minutes
   let startDateTime = date ? new Date(date) : new Date();
   if (teeTime) {
     const [h, m] = teeTime.split(":").map((x) => parseInt(x, 10));
@@ -35,11 +32,9 @@ function buildGoogleCalendarUrl(event, eventUrl) {
     if (!Number.isNaN(m)) startDateTime.setMinutes(m);
   }
 
-  // end time = start + 4.5 hours (typical round)
   const endDateTime = new Date(startDateTime.getTime() + 4.5 * 60 * 60 * 1000);
 
   function toGoogleDateTime(d) {
-    // YYYYMMDDTHHMMSSZ - use UTC
     const yyyy = d.getUTCFullYear();
     const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(d.getUTCDate()).padStart(2, "0");
@@ -49,24 +44,29 @@ function buildGoogleCalendarUrl(event, eventUrl) {
     return `${yyyy}${mm}${dd}T${hh}${min}${ss}Z`;
   }
 
-  const datesParam = `${toGoogleDateTime(startDateTime)}/${toGoogleDateTime(
-    endDateTime
-  )}`;
-
-  // Build title: "⛳ 14:30 - Asquith Golf Club"
+  const datesParam = `${toGoogleDateTime(startDateTime)}/${toGoogleDateTime(endDateTime)}`;
   const calendarTitle = `⛳ ${teeTime || "Golf"} - ${courseName || "Golf Round"}`;
 
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: calendarTitle,
     dates: datesParam,
-    details: notes
-      ? `${notes}\n\nEvent details: ${eventUrl}`
-      : `Event details: ${eventUrl}`,
+    details: notes ? `${notes}\n\nEvent: ${eventUrl}` : `Event: ${eventUrl}`,
     location: courseName,
   });
 
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// Build Google Maps URL from place ID
+function buildGoogleMapsUrl(placeId, courseName) {
+  if (placeId) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(courseName || "Golf Course")}&query_place_id=${placeId}`;
+  }
+  if (courseName) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(courseName)}`;
+  }
+  return null;
 }
 
 export default function EventPage() {
@@ -81,6 +81,7 @@ export default function EventPage() {
   const [savingResponse, setSavingResponse] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const [form, setForm] = useState({
     title: "",
     notes: "",
@@ -94,12 +95,8 @@ export default function EventPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
-  // Max players for a group (4 is standard)
   const MAX_PLAYERS = 4;
 
-  // ---------------------------------------------------------------------------
-  // Load event + users
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     async function loadEvent() {
       try {
@@ -119,11 +116,8 @@ export default function EventPage() {
           setMyStatus(r[user.uid] || null);
         }
 
-        if (data.title) {
-          setForm((f) => ({ ...f, title: data.title }));
-        }
-        setForm((f) => ({
-          ...f,
+        setForm({
+          title: data.title || "",
           notes: data.notes || "",
           courseName: data.courseName || "",
           courseAddress: data.courseAddress || "",
@@ -133,7 +127,7 @@ export default function EventPage() {
           rsvpDeadline: data.rsvpDeadline
             ? data.rsvpDeadline.toDate().toISOString().slice(0, 10)
             : "",
-        }));
+        });
       } catch (err) {
         console.error("Error loading event", err);
       } finally {
@@ -158,25 +152,13 @@ export default function EventPage() {
     loadUsers();
   }, [id, navigate, user]);
 
-  // ---------------------------------------------------------------------------
-  // Update RSVP
-  // ---------------------------------------------------------------------------
   async function updateResponse(newStatus) {
     if (!user || !event) return;
-
     setSavingResponse(true);
     try {
       const ref = doc(db, "events", event.id);
-
-      const newResponses = {
-        ...responses,
-        [user.uid]: newStatus,
-      };
-
-      await updateDoc(ref, {
-        responses: newResponses,
-      });
-
+      const newResponses = { ...responses, [user.uid]: newStatus };
+      await updateDoc(ref, { responses: newResponses });
       setResponses(newResponses);
       setMyStatus(newStatus);
     } catch (err) {
@@ -186,74 +168,49 @@ export default function EventPage() {
     }
   }
 
-  // Admin removing a player from the event
   const removePlayer = async (uid) => {
     if (!event || !uid) return;
-
     const ref = doc(db, "events", event.id);
-
     const updated = { ...responses };
     delete updated[uid];
-
     await updateDoc(ref, { responses: updated });
     setResponses(updated);
-
-    if (uid === user?.uid) {
-      setMyStatus(null);
-    }
+    if (uid === user?.uid) setMyStatus(null);
   };
 
-  // ---------------------------------------------------------------------------
-  // Mark / unmark as booked
-  // ---------------------------------------------------------------------------
   const markBooked = async () => {
     if (!event) return;
-
     const ref = doc(db, "events", id);
-
-    await updateDoc(ref, {
-      booked: true,
-      bookedAt: new Date().toISOString(),
-    });
-
-    setEvent((prev) =>
-      prev
-        ? {
-            ...prev,
-            booked: true,
-            bookedAt: new Date().toISOString(),
-          }
-        : prev
-    );
+    await updateDoc(ref, { booked: true, bookedAt: new Date().toISOString() });
+    setEvent((prev) => prev ? { ...prev, booked: true, bookedAt: new Date().toISOString() } : prev);
   };
 
   const unmarkBooked = async () => {
     if (!event) return;
-
     const ref = doc(db, "events", id);
-
-    await updateDoc(ref, {
-      booked: false,
-      bookedAt: null,
-    });
-
-    setEvent((prev) =>
-      prev
-        ? {
-            ...prev,
-            booked: false,
-            bookedAt: null,
-          }
-        : prev
-    );
+    await updateDoc(ref, { booked: false, bookedAt: null });
+    setEvent((prev) => prev ? { ...prev, booked: false, bookedAt: null } : prev);
   };
 
-  // ---------------------------------------------------------------------------
-  // Save edits
-  // ---------------------------------------------------------------------------
+  const sendRsvpReminder = async () => {
+  if (!event) return;
+  setSendingReminder(true);
+  try {
+    // Explicitly specify the region (us-central1 is the default)
+    const functions = getFunctions(app, 'us-central1');
+    const triggerReminder = httpsCallable(functions, 'triggerRsvpReminder');
+    const result = await triggerReminder({ eventId: event.id });
+    alert(result.data.message || "Reminders sent!");
+  } catch (error) {
+    console.error("Error sending reminder:", error);
+    alert("Failed to send reminder: " + (error.message || "Unknown error"));
+  } finally {
+    setSendingReminder(false);
+  }
+};
+
   async function saveEdits() {
     if (!event) return;
-
     try {
       const ref = doc(db, "events", event.id);
       let updatedFields = {
@@ -264,22 +221,12 @@ export default function EventPage() {
         coursePlaceId: form.coursePlaceId,
         coursePhotoUrl: form.coursePhotoUrl,
         tee: form.tee,
+        rsvpDeadline: form.rsvpDeadline 
+          ? Timestamp.fromDate(new Date(form.rsvpDeadline + "T23:59:59")) 
+          : null,
       };
-
-      if (form.rsvpDeadline) {
-        updatedFields.rsvpDeadline = Timestamp.fromDate(
-          new Date(form.rsvpDeadline + "T23:59:59")
-        );
-      } else {
-        updatedFields.rsvpDeadline = null;
-      }
-
       await updateDoc(ref, updatedFields);
-
-      setEvent((prev) =>
-        prev ? { ...prev, ...updatedFields } : prev
-      );
-
+      setEvent((prev) => prev ? { ...prev, ...updatedFields } : prev);
       setEditing(false);
     } catch (err) {
       console.error("Error saving edits", err);
@@ -287,95 +234,40 @@ export default function EventPage() {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Delete event
-  // ---------------------------------------------------------------------------
   async function deleteEvent() {
-    if (!event) return;
-
-    if (!window.confirm("Delete this event?")) return;
-
+    if (!event || !window.confirm("Delete this event?")) return;
     try {
-      const ref = doc(db, "events", event.id);
-      await deleteDoc(ref);
+      await deleteDoc(doc(db, "events", event.id));
       navigate("/");
     } catch (err) {
       console.error("Error deleting event", err);
-      alert("Could not delete this event.");
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // WhatsApp share
-  // ---------------------------------------------------------------------------
   async function shareToClipboard() {
     if (!event) return;
-
-    // Build the share message
     const date = event.date?.toDate ? event.date.toDate() : null;
-    const dateStr = date
-      ? date.toLocaleDateString("en-AU", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-        })
-      : "";
-
+    const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
     const eventUrl = window.location.href;
 
     let msg = `⛳ *${event.title || "Golf round"}*\n`;
     if (dateStr) msg += `📅 ${dateStr}\n`;
-    if (event.tee) msg += `🕒 Tee time: ${event.tee}\n`;
+    if (event.tee) msg += `🕒 ${event.tee}\n`;
     if (event.courseName) msg += `📍 ${event.courseName}\n`;
-
-    // Get player names
-    const attendingIds = Object.entries(responses)
-      .filter(([_, status]) => status === "available")
-      .map(([uid]) => uid);
-    
-    if (attendingIds.length > 0) {
-      const playerNames = attendingIds.map((uid) => {
-        const user = allUsers.find((u) => u.id === uid);
-        return user?.username || user?.email?.split("@")[0] || "Unknown";
-      });
-      msg += `👥 Playing: ${playerNames.join(", ")}\n`;
-    } else {
-      msg += `👥 No players yet\n`;
-    }
-
-    if (event.booked) {
-      msg += "✅ *This round is booked*\n";
-    } else {
-      msg += "🟦 *RSVPs open*\n";
-    }
-
-    msg += `\n🔗 Event details:\n${eventUrl}`;
+    msg += `\n🔗 ${eventUrl}`;
 
     try {
       await navigator.clipboard.writeText(msg);
-      alert("Message copied to clipboard!");
-    } catch (err) {
-      console.error("Failed to copy:", err);
-      // Fallback for older browsers
-      const textArea = document.createElement("textarea");
-      textArea.value = msg;
-      textArea.style.position = "fixed";
-      textArea.style.left = "-9999px";
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-      alert("Message copied to clipboard!");
+      alert("Copied to clipboard!");
+    } catch {
+      alert("Could not copy.");
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   if (loadingEvent || loadingUsers) {
     return (
       <div className="page">
-        <div className="card" style={{ maxWidth: 400, margin: "3rem auto" }}>
+        <div className="card" style={{ maxWidth: 400, margin: "3rem auto", textAlign: "center" }}>
           Loading…
         </div>
       </div>
@@ -392,704 +284,399 @@ export default function EventPage() {
     );
   }
 
-  const date = event.date?.toDate ? event.date.toDate() : null;
-
-  // Get all players who responded "available", ordered by response time if available
   const allAttendingIds = Object.entries(responses)
     .filter(([_, status]) => status === "available")
     .map(([uid]) => uid);
   
-  // First MAX_PLAYERS are confirmed, rest are reserves
   const confirmedIds = allAttendingIds.slice(0, MAX_PLAYERS);
   const reserveIds = allAttendingIds.slice(MAX_PLAYERS);
-  
-  // For backward compatibility, keep attendingIds as all attending
-  const attendingIds = allAttendingIds;
-  
-  // Check if current user is on reserve list
   const isUserReserve = user && reserveIds.includes(user.uid);
   const isUserConfirmed = user && confirmedIds.includes(user.uid);
 
-  const statusLabel = event.booked ? "Booked" : "Proposed";
-  const statusColor = event.booked ? "#4ade80" : "#facc15";
+  const getUserName = (uid) => {
+    const u = allUsers.find((x) => x.id === uid);
+    return u?.username || u?.email?.split("@")[0] || "Unknown";
+  };
+
+  const mapsUrl = buildGoogleMapsUrl(event.coursePlaceId, event.courseName);
 
   return (
-    <div className="page">
-      {/* YOUR STATUS BANNER - Shows if you've responded */}
-      {myStatus && (
-        <div 
-          style={{
-            padding: "12px 16px",
-            marginBottom: 16,
-            borderRadius: 12,
-            background: myStatus === "available" 
-              ? isUserReserve 
-                ? "var(--color-warning-soft)" 
-                : "var(--color-success-soft)" 
-              : "var(--color-surface-soft)",
+    <div className="page" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      
+      {/* HEADER CARD */}
+      <div className="card" style={{ padding: 0 }}>
+        {/* Hero Image */}
+        <div style={{ position: "relative", height: 180, background: "var(--color-bg-tertiary)", overflow: "hidden", borderRadius: "12px 12px 0 0" }}>
+          <PlacePhoto
+            placeId={event.coursePlaceId}
+            alt={event.courseName || "Course"}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          {/* Status badge overlay */}
+          <div style={{ 
+            position: "absolute", 
+            top: 12, 
+            right: 12,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 20 }}>
-              {myStatus === "available" 
-                ? isUserReserve ? "🔔" : "✅" 
-                : "❌"}
+            gap: 8,
+          }}>
+            <span className={`status-badge ${event.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
+              <span className="status-badge--dot" />
+              {event.booked ? "Booked" : "Proposed"}
             </span>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>
-                {myStatus === "available" 
-                  ? isUserReserve 
-                    ? "You're on the reserve list" 
-                    : "You're in!" 
-                  : "You declined"}
-              </div>
-              <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
-                {isUserReserve 
-                  ? `Position ${reserveIds.indexOf(user.uid) + 1} in queue` 
-                  : `${confirmedIds.length} confirmed${reserveIds.length > 0 ? `, ${reserveIds.length} on reserve` : ""}`}
-              </div>
-            </div>
           </div>
-          {event.booked && myStatus === "available" && isUserConfirmed && (
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => {
-                const url = window.location.href;
-                const calUrl = buildGoogleCalendarUrl(event, url);
-                window.open(calUrl, "_blank");
-              }}
-            >
-              📅 Add to Calendar
-            </button>
-          )}
         </div>
-      )}
 
-      {/* MAIN EVENT CARD */}
-      <div className="card event-card">
-        {/* Header row with title, status, and menu */}
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "flex-start",
-          marginBottom: 12,
-          gap: 12,
-        }}>
-          <div style={{ flex: 1 }}>
-            {/* Title + Status */}
-            <div className="event-title-row">
+        {/* Content */}
+        <div style={{ padding: 20 }}>
+          {/* Title row */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flex: 1 }}>
               {!editing ? (
-                <h1 className="event-title">{event.title}</h1>
+                <h1 style={{ fontSize: 22, marginBottom: 4 }}>{event.title}</h1>
               ) : (
                 <input
                   className="input"
-                  type="text"
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  style={{ fontSize: 18, width: "100%" }}
+                  placeholder="Event title"
+                  style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}
                 />
               )}
-              <span
-                className="status-pill"
-                style={{
-                  background: event.booked
-                    ? "linear-gradient(90deg,#22c55e,#4ade80)"
-                    : "linear-gradient(90deg,#facc15,#f97316)",
-                }}
-              >
-                <span className="status-dot" />
-                {statusLabel}
-              </span>
             </div>
-            <p className="event-date">
-              {date &&
-                date.toLocaleDateString("en-AU", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-              {event.tee && ` • ${event.tee}`}
-            </p>
-          </div>
 
-          {/* Action buttons / Menu */}
-          {isAdmin && (
-            <div style={{ position: "relative" }}>
-              {editing ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-primary btn-sm" onClick={saveEdits}>
-                    Save
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <>
+            {/* Menu button */}
+            {isAdmin && (
+              <div style={{ position: "relative" }}>
+                {editing ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn btn-primary btn-sm" onClick={saveEdits}>Save</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>Cancel</button>
+                  </div>
+                ) : (
                   <button 
                     className="btn btn-ghost btn-sm"
                     onClick={() => setShowMenu(!showMenu)}
-                    style={{ padding: "8px 12px", fontSize: 18 }}
                   >
                     •••
                   </button>
-                  {showMenu && (
-                    <>
-                      <div 
-                        style={{
-                          position: "fixed",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          zIndex: 10,
-                        }}
-                        onClick={() => setShowMenu(false)}
-                      />
-                      <div style={{
-                        position: "absolute",
-                        top: "100%",
-                        right: 0,
-                        marginTop: 4,
-                        background: "var(--color-surface)",
-                        border: "1px solid var(--color-border-subtle)",
-                        borderRadius: 8,
-                        boxShadow: "var(--shadow-soft)",
-                        minWidth: 160,
-                        zIndex: 20,
-                        overflow: "hidden",
-                      }}>
-                        <button
-                          onClick={() => { setEditing(true); setShowMenu(false); }}
-                          style={{
-                            display: "block",
-                            width: "100%",
-                            padding: "10px 14px",
-                            border: "none",
-                            background: "none",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            color: "var(--color-text-main)",
-                          }}
-                          onMouseOver={(e) => e.target.style.background = "var(--color-surface-soft)"}
-                          onMouseOut={(e) => e.target.style.background = "none"}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => { shareToClipboard(); setShowMenu(false); }}
-                          style={{
-                            display: "block",
-                            width: "100%",
-                            padding: "10px 14px",
-                            border: "none",
-                            background: "none",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            color: "var(--color-text-main)",
-                          }}
-                          onMouseOver={(e) => e.target.style.background = "var(--color-surface-soft)"}
-                          onMouseOut={(e) => e.target.style.background = "none"}
-                        >
-                          📤 Share
-                        </button>
-                        {event.booked && (
-                          <button
-                            onClick={() => {
-                              const url = window.location.href;
-                              const calUrl = buildGoogleCalendarUrl(event, url);
-                              window.open(calUrl, "_blank");
-                              setShowMenu(false);
-                            }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              padding: "10px 14px",
-                              border: "none",
-                              background: "none",
-                              textAlign: "left",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              color: "var(--color-text-main)",
-                            }}
-                            onMouseOver={(e) => e.target.style.background = "var(--color-surface-soft)"}
-                            onMouseOut={(e) => e.target.style.background = "none"}
-                          >
-                            📅 Add to Calendar
-                          </button>
-                        )}
-                        {!event.booked ? (
-                          <button
-                            onClick={() => { markBooked(); setShowMenu(false); }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              padding: "10px 14px",
-                              border: "none",
-                              background: "none",
-                              textAlign: "left",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              color: "var(--color-text-main)",
-                            }}
-                            onMouseOver={(e) => e.target.style.background = "var(--color-surface-soft)"}
-                            onMouseOut={(e) => e.target.style.background = "none"}
-                          >
-                            ✅ Mark as Booked
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => { unmarkBooked(); setShowMenu(false); }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              padding: "10px 14px",
-                              border: "none",
-                              background: "none",
-                              textAlign: "left",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              color: "var(--color-text-main)",
-                            }}
-                            onMouseOver={(e) => e.target.style.background = "var(--color-surface-soft)"}
-                            onMouseOut={(e) => e.target.style.background = "none"}
-                          >
-                            ↩️ Unmark Booked
-                          </button>
-                        )}
-                        <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "4px 0" }} />
-                        <button
-                          onClick={() => { deleteEvent(); setShowMenu(false); }}
-                          style={{
-                            display: "block",
-                            width: "100%",
-                            padding: "10px 14px",
-                            border: "none",
-                            background: "none",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            color: "var(--color-danger)",
-                          }}
-                          onMouseOver={(e) => e.target.style.background = "var(--color-danger-soft)"}
-                          onMouseOut={(e) => e.target.style.background = "none"}
-                        >
-                          🗑️ Delete Event
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* RSVP Section - Moved higher for prominence */}
-        {!editing && (
-          <div style={{ 
-            padding: "16px",
-            marginBottom: 16,
-            background: "var(--color-surface-soft)",
-            borderRadius: 12,
-          }}>
-            {event.booked ? (
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
-                gap: 10,
-                color: "var(--color-text-muted)",
-              }}>
-                <span style={{ fontSize: 20 }}>🔒</span>
-                <div>
-                  <div style={{ fontWeight: 500, color: "var(--color-text-main)" }}>RSVPs closed</div>
-                  <div style={{ fontSize: 13 }}>This round is booked</div>
-                </div>
-              </div>
-            ) : myStatus ? (
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 12,
-              }}>
-                <div style={{ fontSize: 14, color: "var(--color-text-muted)" }}>
-                  Change your response?
-                </div>
-                <ResponseButtons
-                  currentStatus={myStatus}
-                  onChange={updateResponse}
-                  loading={savingResponse}
-                  compact
-                />
-              </div>
-            ) : (
-              <>
-                <div style={{ 
-                  marginBottom: 12, 
-                  fontSize: 15,
-                  fontWeight: 600,
-                }}>
-                  Are you in? 🏌️
-                </div>
-                {confirmedIds.length >= MAX_PLAYERS && (
-                  <div style={{ 
-                    marginBottom: 12, 
-                    padding: "8px 12px",
-                    background: "var(--color-warning-soft)",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    color: "var(--color-warning)",
-                  }}>
-                    ⚠️ Group is full — you'll be added to the reserve list
-                  </div>
                 )}
-                <ResponseButtons
-                  currentStatus={myStatus}
-                  onChange={updateResponse}
-                  loading={savingResponse}
-                />
-              </>
+                {showMenu && (
+                  <>
+                    <div style={{ position: "fixed", inset: 0, zIndex: 100 }} onClick={() => setShowMenu(false)} />
+                    <div className="dropdown-menu" style={{ zIndex: 101 }}>
+                      <button className="dropdown-item" onClick={() => { setEditing(true); setShowMenu(false); }}>
+                        ✏️ Edit
+                      </button>
+                      <button className="dropdown-item" onClick={() => { shareToClipboard(); setShowMenu(false); }}>
+                        📤 Share
+                      </button>
+                      {event.booked && (
+                        <button className="dropdown-item" onClick={() => {
+                          window.open(buildGoogleCalendarUrl(event, window.location.href), "_blank");
+                          setShowMenu(false);
+                        }}>
+                          📅 Add to Calendar
+                        </button>
+                      )}
+                      <button className="dropdown-item" onClick={() => {
+                        event.booked ? unmarkBooked() : markBooked();
+                        setShowMenu(false);
+                      }}>
+                        {event.booked ? "↩️ Unmark Booked" : "✅ Mark Booked"}
+                      </button>
+                      {!event.booked && (
+                        <button 
+                          className="dropdown-item" 
+                          onClick={() => { sendRsvpReminder(); setShowMenu(false); }}
+                          disabled={sendingReminder}
+                        >
+                          {sendingReminder ? "🔔 Sending..." : "🔔 Send RSVP Reminder"}
+                        </button>
+                      )}
+                      <div className="dropdown-divider" />
+                      <button className="dropdown-item dropdown-item--danger" onClick={() => { deleteEvent(); setShowMenu(false); }}>
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
 
-        {/* Main content grid - responsive */}
-        <div className="event-grid">
-          {/* Image + Conditions */}
-          <div className="event-media">
-            <div className="event-image-wrapper">
-              <PlacePhoto
-                placeId={editing ? form.coursePlaceId : event.coursePlaceId}
-                alt="Course"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-              />
-            </div>
-            <div className="event-conditions-wrapper">
+          {/* Quick details */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
+            {!editing ? (
+              <>
+                {event.courseName && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                    <span style={{ fontSize: 16 }}>📍</span>
+                    {mapsUrl ? (
+                      <a 
+                        href={mapsUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ 
+                          color: "var(--color-primary)", 
+                          textDecoration: "none",
+                        }}
+                      >
+                        {event.courseName}
+                      </a>
+                    ) : (
+                      <span>{event.courseName}</span>
+                    )}
+                  </div>
+                )}
+                {event.tee && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                    <span style={{ fontSize: 16 }}>🕐</span>
+                    <span>{event.tee}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                  <span style={{ fontSize: 16 }}>👥</span>
+                  <span>{confirmedIds.length}/{MAX_PLAYERS}</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <label>Course</label>
+                  <CourseAutocomplete
+                    initialValue={form.courseName}
+                    onSelect={(payload) => setForm((f) => ({
+                      ...f,
+                      courseName: payload.name,
+                      courseAddress: payload.address,
+                      coursePlaceId: payload.placeId,
+                      coursePhotoUrl: payload.photoUrl,
+                    }))}
+                  />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label>Tee Time</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={form.tee}
+                      onChange={(e) => setForm((f) => ({ ...f, tee: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label>RSVP Deadline</label>
+                    <input
+                      className="input"
+                      type="date"
+                      value={form.rsvpDeadline}
+                      onChange={(e) => setForm((f) => ({ ...f, rsvpDeadline: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label>Notes</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={form.notes}
+                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Notes (if any, when not editing) */}
+          {!editing && event.notes && (
+            <p style={{ marginTop: 12, fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+              {event.notes}
+            </p>
+          )}
+
+          {/* Golf Conditions */}
+          {!editing && event.coursePlaceId && (
+            <div style={{ marginTop: 16 }}>
               <GolfConditions
                 placeId={event.coursePlaceId}
                 tee={event.tee}
                 date={event.date}
               />
             </div>
-          </div>
-
-          {/* Event Details */}
-          <div className="event-details">
-            {/* Course */}
-            <div className="detail-item">
-              <div className="detail-label">Course</div>
-              {!editing ? (
-                <div className="detail-value">
-                  {event.courseName || "—"}
-                  {event.courseAddress && (
-                    <span className="detail-secondary"> · {event.courseAddress}</span>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <CourseAutocomplete
-                    key={form.courseName}
-                    initialValue={form.courseName}
-                    onSelect={(payload) =>
-                      setForm((f) => ({
-                        ...f,
-                        courseName: payload.name,
-                        courseAddress: payload.address,
-                        coursePlaceId: payload.placeId,
-                        coursePhotoUrl: payload.photoUrl,
-                      }))
-                    }
-                  />
-                  <div className="detail-secondary" style={{ marginTop: 4 }}>
-                    {form.courseAddress}
-                  </div>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    type="button"
-                    style={{ marginTop: 8 }}
-                    onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        courseName: "",
-                        courseAddress: "",
-                        coursePlaceId: "",
-                        coursePhotoUrl: "",
-                      }))
-                    }
-                  >
-                    Clear course
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* Tee Time */}
-            <div className="detail-item">
-              <div className="detail-label">Tee Time</div>
-              {!editing ? (
-                <div className="detail-value">{event.tee || "—"}</div>
-              ) : (
-                <input
-                  className="input"
-                  type="time"
-                  value={form.tee}
-                  onChange={(e) => setForm((f) => ({ ...f, tee: e.target.value }))}
-                  style={{ maxWidth: 200, width: "100%" }}
-                />
-              )}
-            </div>
-
-            {/* Notes */}
-            <div className="detail-item">
-              <div className="detail-label">Notes</div>
-              {!editing ? (
-                <div className="detail-value">
-                  {event.notes || <span className="detail-secondary">No notes added</span>}
-                </div>
-              ) : (
-                <textarea
-                  className="input"
-                  rows={3}
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="e.g. Meet at the range 30 mins before."
-                  style={{ width: "100%" }}
-                />
-              )}
-            </div>
-
-            {/* RSVP Deadline */}
-            <div className="detail-item">
-              <div className="detail-label">RSVP Deadline</div>
-              {!editing ? (
-                <div className="detail-value">
-                  {event.rsvpDeadline?.toDate
-                    ? event.rsvpDeadline.toDate().toLocaleDateString("en-AU", {
-                        weekday: "short",
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : "—"}
-                </div>
-              ) : (
-                <input
-                  className="input"
-                  type="date"
-                  value={form.rsvpDeadline}
-                  onChange={(e) => setForm((f) => ({ ...f, rsvpDeadline: e.target.value }))}
-                  style={{ maxWidth: 220, width: "100%" }}
-                />
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* PLAYERS CARD - Confirmed + Reserves */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-header">
-          <div className="card-title-group">
-            <h3 className="card-title">
-              Players ({confirmedIds.length}/{MAX_PLAYERS})
-            </h3>
-            {confirmedIds.length >= MAX_PLAYERS ? (
-              <p className="card-subtitle" style={{ color: "var(--color-success)" }}>
-                ✓ Group is full
-              </p>
-            ) : (
-              <p className="card-subtitle">
-                {MAX_PLAYERS - confirmedIds.length} spot{MAX_PLAYERS - confirmedIds.length !== 1 ? "s" : ""} open
-              </p>
+      {/* RSVP CARD */}
+      {!editing && (
+        <div className="card rsvp-card">
+          {event.booked ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 20 }}>🔒</span>
+              <div>
+                <div style={{ fontWeight: 500 }}>RSVPs closed</div>
+                <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>This round is booked</div>
+              </div>
+              {isUserConfirmed && (
+                <button 
+                  className="btn btn-primary btn-sm"
+                  style={{ marginLeft: "auto" }}
+                  onClick={() => window.open(buildGoogleCalendarUrl(event, window.location.href), "_blank")}
+                >
+                  📅 Add to Calendar
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 12, fontWeight: 500 }}>Are you in?</div>
+              {confirmedIds.length >= MAX_PLAYERS && !myStatus && (
+                <div style={{ 
+                  marginBottom: 12, 
+                  padding: "8px 12px", 
+                  background: "var(--color-warning-soft)", 
+                  borderRadius: 6,
+                  fontSize: 13,
+                  color: "var(--color-warning)",
+                }}>
+                  Group is full — you'll be added to the reserve list
+                </div>
+              )}
+              <div className="rsvp-buttons">
+                <button
+                  className={`rsvp-btn rsvp-btn--available ${myStatus === "available" ? "active" : ""}`}
+                  onClick={() => updateResponse(myStatus === "available" ? null : "available")}
+                  disabled={savingResponse}
+                >
+                  {savingResponse && myStatus === "available" ? "..." : "✓ I'm in"}
+                </button>
+                <button
+                  className={`rsvp-btn rsvp-btn--unavailable ${myStatus === "unavailable" ? "active" : ""}`}
+                  onClick={() => updateResponse(myStatus === "unavailable" ? null : "unavailable")}
+                  disabled={savingResponse}
+                >
+                  {savingResponse && myStatus === "unavailable" ? "..." : "✗ Can't make it"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Your status banner */}
+      {myStatus && !editing && (
+        <div style={{
+          padding: "12px 16px",
+          borderRadius: 8,
+          background: myStatus === "available" 
+            ? isUserReserve ? "var(--color-warning-soft)" : "var(--color-success-soft)"
+            : "var(--color-bg-secondary)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}>
+          <span style={{ fontSize: 18 }}>
+            {myStatus === "available" ? (isUserReserve ? "🔔" : "✓") : "✗"}
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 500, fontSize: 14 }}>
+              {myStatus === "available" 
+                ? isUserReserve ? "You're on the reserve list" : "You're in!"
+                : "You declined"}
+            </div>
+            {isUserReserve && (
+              <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                Position {reserveIds.indexOf(user.uid) + 1} in queue
+              </div>
             )}
           </div>
         </div>
-        <div className="card-body">
-          {/* Confirmed Players */}
-          {confirmedIds.length === 0 ? (
-            <p className="text-muted" style={{ padding: "8px 0" }}>
-              No one has responded yet. Be the first! 🏌️
-            </p>
-          ) : (
-            confirmedIds.map((uid, index) => {
-              const u = allUsers.find((x) => x.id === uid);
-              const label = u?.username || u?.email?.split("@")[0] || "Unknown";
+      )}
+
+      {/* PLAYERS CARD */}
+      <div className="card">
+        <div className="section-header">
+          <span className="section-title">Players</span>
+          <span className="section-count">{confirmedIds.length}/{MAX_PLAYERS}</span>
+        </div>
+
+        {confirmedIds.length === 0 ? (
+          <div className="empty-state" style={{ padding: "24px 0" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🏌️</div>
+            <div>No one has responded yet</div>
+          </div>
+        ) : (
+          <div className="player-list">
+            {confirmedIds.map((uid) => {
               const isYou = uid === user?.uid;
               return (
-                <div
-                  key={uid}
-                  style={{
-                    padding: "12px 0",
-                    borderBottom: index < confirmedIds.length - 1 || reserveIds.length > 0
-                      ? "1px solid var(--color-border-subtle)" 
-                      : "none",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      background: isYou ? "var(--color-primary)" : "var(--color-primary-soft)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 600,
-                      fontSize: 14,
-                      color: isYou ? "#fff" : "var(--color-primary)",
-                    }}>
-                      {label.charAt(0).toUpperCase()}
+                <div key={uid} className="player-item">
+                  <div className="player-info">
+                    <div className={`player-avatar ${isYou ? "player-avatar--you" : ""}`}>
+                      {getUserName(uid).charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                        {label}
-                        {isYou && (
-                          <span style={{ 
-                            fontSize: 11, 
-                            background: "var(--color-primary)", 
-                            color: "#fff", 
-                            padding: "2px 6px", 
-                            borderRadius: 4,
-                          }}>
-                            You
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                        Confirmed
-                      </div>
-                    </div>
+                    <span className="player-name">
+                      {getUserName(uid)}
+                      {isYou && <span className="player-badge">You</span>}
+                    </span>
                   </div>
-
                   {isAdmin && (
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => removePlayer(uid)}
-                      style={{ color: "var(--color-text-muted)", fontSize: 12 }}
-                    >
+                    <button className="btn btn-ghost btn-sm" onClick={() => removePlayer(uid)}>
                       Remove
                     </button>
                   )}
                 </div>
               );
-            })
-          )}
+            })}
+          </div>
+        )}
 
-          {/* Reserves Section */}
-          {reserveIds.length > 0 && (
-            <>
-              <div style={{ 
-                padding: "12px 0 8px", 
-                display: "flex", 
-                alignItems: "center", 
-                gap: 8,
-              }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-muted)" }}>
-                  🔔 Reserve List
-                </span>
-                <span style={{ 
-                  fontSize: 11, 
-                  background: "var(--color-warning-soft)", 
-                  color: "var(--color-warning)", 
-                  padding: "2px 8px", 
-                  borderRadius: 10,
-                }}>
-                  {reserveIds.length} waiting
-                </span>
-              </div>
-              {reserveIds.map((uid, index) => {
-                const u = allUsers.find((x) => x.id === uid);
-                const label = u?.username || u?.email?.split("@")[0] || "Unknown";
+        {/* Reserve list */}
+        {reserveIds.length > 0 && (
+          <>
+            <div className="divider" />
+            <div className="section-header">
+              <span className="section-title">Reserve List</span>
+              <span className="section-count">{reserveIds.length}</span>
+            </div>
+            <div className="player-list">
+              {reserveIds.map((uid, idx) => {
                 const isYou = uid === user?.uid;
                 return (
-                  <div
-                    key={uid}
-                    style={{
-                      padding: "10px 0",
-                      borderBottom: index < reserveIds.length - 1 
-                        ? "1px solid var(--color-border-subtle)" 
-                        : "none",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      opacity: 0.8,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div key={uid} className="player-item" style={{ opacity: 0.7 }}>
+                    <div className="player-info">
                       <div style={{
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         borderRadius: "50%",
                         background: "var(--color-warning-soft)",
+                        color: "var(--color-warning)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        fontSize: 12,
                         fontWeight: 600,
-                        fontSize: 13,
-                        color: "var(--color-warning)",
                       }}>
-                        {index + 1}
+                        {idx + 1}
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                          {label}
-                          {isYou && (
-                            <span style={{ 
-                              fontSize: 11, 
-                              background: "var(--color-warning)", 
-                              color: "#fff", 
-                              padding: "2px 6px", 
-                              borderRadius: 4,
-                            }}>
-                              You
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                          Reserve #{index + 1}
-                        </div>
-                      </div>
+                      <span className="player-name">
+                        {getUserName(uid)}
+                        {isYou && <span className="player-badge" style={{ background: "var(--color-warning)" }}>You</span>}
+                      </span>
                     </div>
-
                     {isAdmin && (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => removePlayer(uid)}
-                        style={{ color: "var(--color-text-muted)", fontSize: 12 }}
-                      >
+                      <button className="btn btn-ghost btn-sm" onClick={() => removePlayer(uid)}>
                         Remove
                       </button>
                     )}
                   </div>
                 );
               })}
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
-
-      {/* MAP */}
-      {event.coursePlaceId && (
-        <div className="card simple" style={{ marginBottom: 20 }}>
-          <CourseMiniMap placeId={event.coursePlaceId} />
-        </div>
-      )}
     </div>
   );
 }

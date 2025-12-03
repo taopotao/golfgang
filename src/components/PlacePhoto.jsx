@@ -1,18 +1,7 @@
 import { useEffect, useState } from "react";
 
-/**
- * Fetches and displays a photo for a Google Place using the place_id.
- * This avoids 403 errors by fetching fresh photo URLs on each render.
- * 
- * Props:
- *  - placeId: Google Place ID
- *  - fallback: Fallback image URL if no photo available
- *  - style: CSS styles for the img element
- *  - alt: Alt text for the image
- */
 export default function PlacePhoto({ 
   placeId, 
-  fallback = "/share-bg-01.jpg", 
   style = {},
   alt = "Place photo"
 }) {
@@ -26,9 +15,8 @@ export default function PlacePhoto({
       return;
     }
 
-    // Check if Google Maps is loaded
     if (!window.google || !window.google.maps || !window.google.maps.places) {
-      console.warn("Google Maps not loaded, using fallback image");
+      console.warn("Google Maps not loaded");
       setPhotoUrl(null);
       setLoading(false);
       return;
@@ -36,7 +24,6 @@ export default function PlacePhoto({
 
     setLoading(true);
 
-    // Create a temporary div for PlacesService (it requires a map or div)
     const tempDiv = document.createElement("div");
     const service = new window.google.maps.places.PlacesService(tempDiv);
 
@@ -56,7 +43,6 @@ export default function PlacePhoto({
           });
           setPhotoUrl(url);
         } else {
-          console.log("No photos found for place:", placeId, status);
           setPhotoUrl(null);
         }
         setLoading(false);
@@ -64,32 +50,34 @@ export default function PlacePhoto({
     );
   }, [placeId]);
 
-  if (loading) {
+  // Show placeholder for loading or no photo
+  if (loading || !photoUrl) {
     return (
       <div
         style={{
           ...style,
-          background: "var(--color-surface-soft)",
+          background: "linear-gradient(135deg, var(--color-surface-soft) 0%, var(--color-surface) 100%)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>
-          Loading...
-        </span>
+        {loading && (
+          <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>
+            Loading...
+          </span>
+        )}
       </div>
     );
   }
 
   return (
     <img
-      src={photoUrl || fallback}
+      src={photoUrl}
       alt={alt}
       style={style}
       onError={(e) => {
-        e.target.onerror = null;
-        e.target.src = fallback;
+        e.target.style.display = "none";
       }}
     />
   );

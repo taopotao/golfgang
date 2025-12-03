@@ -15,7 +15,7 @@ export default function Signup() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState(""); // new
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,21 +41,14 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      // Check if username taken
       if (await usernameExists(cleanedUsername)) {
         setError("That username is already taken.");
         setLoading(false);
         return;
       }
 
-      // Create authentication account
-      const result = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      const result = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Save user record
       await setDoc(doc(db, "users", result.user.uid), {
         email,
         username: cleanedUsername,
@@ -71,68 +64,87 @@ export default function Signup() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "4rem auto", padding: "1rem" }}>
-      <div className="surface" style={{ padding: "2rem" }}>
-        <h1 style={{ marginTop: 0, fontSize: "1.8rem" }}>Create account</h1>
+    <div style={{
+      minHeight: "calc(100vh - var(--nav-height))",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    }}>
+      <div className="card" style={{ width: "100%", maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            background: "linear-gradient(135deg, #0f7b6c 0%, #2383e2 100%)",
+            margin: "0 auto 16px",
+          }} />
+          <h1 style={{ marginBottom: 4 }}>Create account</h1>
+          <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14 }}>
+            Join GolfGang to plan rounds with friends
+          </p>
+        </div>
 
-        <form onSubmit={handleSignup} style={{ marginTop: "1.5rem" }}>
-          {/* EMAIL */}
-          <label style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-            Email
-          </label>
-          <input
-            className="input"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            style={{ marginBottom: "1rem" }}
-            required
-          />
+        {error && (
+          <div className="toast toast-danger" style={{ marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
 
-          {/* USERNAME */}
-          <label style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-            Username
-          </label>
-          <input
-            className="input"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Choose a username"
-            style={{ marginBottom: "1rem" }}
-            required
-          />
+        <form onSubmit={handleSignup}>
+          <div style={{ marginBottom: 16 }}>
+            <label>Email</label>
+            <input
+              className="input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
 
-          {/* PASSWORD */}
-          <label style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-            Password
-          </label>
-          <input
-            className="input"
-            type="password"
-            placeholder="Create a password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ marginBottom: "1rem" }}
-            required
-          />
-
-          {/* ERROR MESSAGE */}
-          {error && (
-            <p style={{ color: "var(--danger)", marginBottom: "1rem" }}>
-              {error}
+          <div style={{ marginBottom: 16 }}>
+            <label>Username</label>
+            <input
+              className="input"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Choose a username"
+              required
+            />
+            <p className="helper-text" style={{ marginTop: 4 }}>
+              Letters, numbers, and underscores only
             </p>
-          )}
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label>Password</label>
+            <input
+              className="input"
+              type="password"
+              placeholder="Create a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
           <button
             className="btn btn-primary"
-            style={{ width: "100%" }}
+            style={{ width: "100%", padding: "12px 16px" }}
             disabled={loading}
             type="submit"
           >
             {loading ? "Creating account…" : "Sign up"}
           </button>
         </form>
+
+        <div style={{ marginTop: 20, textAlign: "center", fontSize: 14 }}>
+          <span style={{ color: "var(--color-text-secondary)" }}>Already have an account? </span>
+          <a href="/login">Sign in</a>
+        </div>
       </div>
     </div>
   );

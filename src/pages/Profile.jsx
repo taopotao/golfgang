@@ -31,10 +31,7 @@ export default function Profile() {
   if (!user || !profile) {
     return (
       <div className="page">
-        <div
-          className="card"
-          style={{ maxWidth: 400, margin: "3rem auto" }}
-        >
+        <div className="card" style={{ maxWidth: 400, margin: "3rem auto", textAlign: "center" }}>
           Loading…
         </div>
       </div>
@@ -48,10 +45,7 @@ export default function Profile() {
   }
 
   async function verifyPassword() {
-    const credential = EmailAuthProvider.credential(
-      user.email,
-      currentPass
-    );
+    const credential = EmailAuthProvider.credential(user.email, currentPass);
     await reauthenticateWithCredential(user, credential);
   }
 
@@ -62,9 +56,7 @@ export default function Profile() {
     const clean = username.toLowerCase().trim();
 
     if (!clean.match(/^[a-z0-9_]+$/)) {
-      setError(
-        "Username must contain only letters, numbers, and underscores."
-      );
+      setError("Username can only contain letters, numbers, and underscores.");
       return;
     }
 
@@ -73,10 +65,7 @@ export default function Profile() {
       return;
     }
 
-    await updateDoc(doc(db, "users", user.uid), {
-      username: clean,
-    });
-
+    await updateDoc(doc(db, "users", user.uid), { username: clean });
     setMsg("Username updated.");
   }
 
@@ -87,11 +76,7 @@ export default function Profile() {
     try {
       await verifyPassword();
       await updateEmail(user, email);
-
-      await updateDoc(doc(db, "users", user.uid), {
-        email,
-      });
-
+      await updateDoc(doc(db, "users", user.uid), { email });
       setMsg("Email updated.");
     } catch (err) {
       setError(err.message);
@@ -106,6 +91,8 @@ export default function Profile() {
       await verifyPassword();
       await updatePassword(user, newPass);
       setMsg("Password updated.");
+      setNewPass("");
+      setCurrentPass("");
     } catch (err) {
       setError(err.message);
     }
@@ -113,136 +100,111 @@ export default function Profile() {
 
   return (
     <div className="page">
-      <div
-        className="card"
-        style={{ maxWidth: 520, margin: "3rem auto" }}
-      >
-        <div className="card-header">
-
-          <NotificationSettings />
-          
-          <div className="card-title-group">
-            <h1 className="card-title">Your profile</h1>
-            <p className="card-subtitle">
-              Update your username, email, and password.
-            </p>
+      <div style={{ maxWidth: 480, margin: "0 auto" }}>
+        <div className="page-header">
+          <div className="page-header-title">
+            <h1>Profile</h1>
+            <p>Manage your account settings</p>
           </div>
         </div>
 
-        <div className="card-body">
-          {msg && (
-            <div className="toast toast-success" style={{ marginBottom: 12 }}>
-              {msg}
-            </div>
-          )}
-          {error && (
-            <div className="toast toast-danger" style={{ marginBottom: 12 }}>
-              {error}
-            </div>
-          )}
+        {/* Notifications */}
+        <NotificationSettings />
 
-          {/* Username */}
-          <section style={{ marginTop: 8 }}>
-            <h3 style={{ marginBottom: 8, fontSize: 16 }}>Username</h3>
-            <div className="form-field">
-              <input
-                className="input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                style={{ width: "100%" }}
-              />
-              <small>
-                Use lowercase letters, numbers, and underscores only.
-              </small>
-            </div>
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ marginTop: 10 }}
-              onClick={handleUpdateUsername}
-            >
-              Update username
-            </button>
-          </section>
+        {/* Messages */}
+        {msg && (
+          <div className="toast toast-success" style={{ marginBottom: 16 }}>
+            {msg}
+          </div>
+        )}
+        {error && (
+          <div className="toast toast-danger" style={{ marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
 
-          {/* Email */}
-          <section style={{ marginTop: 28 }}>
-            <h3 style={{ marginBottom: 8, fontSize: 16 }}>Email</h3>
+        {/* Username section */}
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="section-header" style={{ marginBottom: 12 }}>
+            <span className="section-title">Username</span>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <input
+              className="input"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Your username"
+            />
+            <p className="helper-text" style={{ marginTop: 4 }}>
+              Letters, numbers, and underscores only
+            </p>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={handleUpdateUsername}>
+            Update username
+          </button>
+        </div>
 
-            <div className="form-field">
+        {/* Email section */}
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="section-header" style={{ marginBottom: 12 }}>
+            <span className="section-title">Email</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
               <label>Email address</label>
               <input
                 className="input"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                style={{ width: "100%" }}
               />
             </div>
+            <div>
+              <label>Current password (to confirm)</label>
+              <input
+                className="input"
+                type="password"
+                value={currentPass}
+                onChange={(e) => setCurrentPass(e.target.value)}
+                placeholder="Enter current password"
+              />
+            </div>
+          </div>
+          <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleUpdateEmail}>
+            Update email
+          </button>
+        </div>
 
-            <p className="text-muted" style={{ marginTop: 10 }}>
-              Enter your current password to confirm.
-            </p>
-
-            <div className="form-field" style={{ marginTop: 8 }}>
+        {/* Password section */}
+        <div className="card">
+          <div className="section-header" style={{ marginBottom: 12 }}>
+            <span className="section-title">Change password</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
               <label>Current password</label>
               <input
                 className="input"
                 type="password"
                 value={currentPass}
                 onChange={(e) => setCurrentPass(e.target.value)}
-                style={{ width: "100%" }}
+                placeholder="Enter current password"
               />
             </div>
-
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ marginTop: 12 }}
-              onClick={handleUpdateEmail}
-            >
-              Update email
-            </button>
-          </section>
-
-          {/* Password */}
-          <section style={{ marginTop: 28 }}>
-            <h3 style={{ marginBottom: 8, fontSize: 16 }}>
-              Change password
-            </h3>
-
-            <p className="text-muted">
-              Enter your current password, then choose a new one.
-            </p>
-
-            <div className="form-field" style={{ marginTop: 10 }}>
-              <label>Current password</label>
-              <input
-                className="input"
-                type="password"
-                value={currentPass}
-                onChange={(e) => setCurrentPass(e.target.value)}
-                style={{ width: "100%" }}
-              />
-            </div>
-
-            <div className="form-field" style={{ marginTop: 10 }}>
+            <div>
               <label>New password</label>
               <input
                 className="input"
                 type="password"
                 value={newPass}
                 onChange={(e) => setNewPass(e.target.value)}
-                style={{ width: "100%" }}
+                placeholder="Enter new password"
               />
             </div>
-
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ marginTop: 12 }}
-              onClick={handleUpdatePassword}
-            >
-              Update password
-            </button>
-          </section>
+          </div>
+          <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleUpdatePassword}>
+            Update password
+          </button>
         </div>
       </div>
     </div>

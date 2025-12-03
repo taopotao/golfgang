@@ -82,11 +82,9 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (!placeId) return null;
 
   const containerStyle = {
-    padding: "12px 14px",
-    background: "var(--color-surface-soft)",
-    borderRadius: 10,
-    width: "100%",
-    boxSizing: "border-box",
+    padding: "14px 16px",
+    background: "var(--color-bg-secondary)",
+    borderRadius: "var(--radius-lg)",
     cursor: "pointer",
     transition: "background 0.15s ease",
   };
@@ -94,8 +92,8 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (loading) {
     return (
       <div style={containerStyle}>
-        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-          Loading weather for {eventDateStr || "event day"}...
+        <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          Loading weather...
         </div>
       </div>
     );
@@ -104,7 +102,7 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (error) {
     return (
       <div style={containerStyle}>
-        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+        <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
           {error}
         </div>
       </div>
@@ -136,36 +134,39 @@ export default function GolfConditions({ placeId, date, tee }) {
       style={containerStyle}
       onClick={() => setExpanded(!expanded)}
     >
-      {/* Header showing this is for event day */}
+      {/* Header */}
       <div style={{ 
         fontSize: 11, 
-        color: "var(--color-text-muted)", 
-        marginBottom: 6,
+        color: "var(--color-text-tertiary)", 
+        marginBottom: 8,
         textTransform: "uppercase",
-        letterSpacing: "0.5px",
+        letterSpacing: "0.04em",
+        fontWeight: 500,
       }}>
-        Weather for {eventDateStr || "event day"} {tee && `@ ${tee}`}
+        Weather {eventDateStr && `• ${eventDateStr}`} {tee && `@ ${tee}`}
       </div>
 
-      {/* Summary line */}
+      {/* Summary */}
       <div style={{ 
         display: "flex", 
         alignItems: "center", 
         justifyContent: "space-between",
-        gap: 8,
+        gap: 12,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 20 }}>{icon}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 24 }}>{icon}</span>
           <div>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)", marginLeft: 8 }}>
-              {temp}°C • {wind} km/h
-            </span>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text)" }}>
+              {label}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+              {temp}°C • {wind} km/h wind • {rain}% rain
+            </div>
           </div>
         </div>
         <span style={{ 
           fontSize: 12, 
-          color: "var(--color-text-muted)",
+          color: "var(--color-text-tertiary)",
           transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
           transition: "transform 0.2s ease",
         }}>
@@ -178,7 +179,10 @@ export default function GolfConditions({ placeId, date, tee }) {
         <div style={{ 
           fontSize: 12, 
           color: "var(--color-danger)", 
-          marginTop: 6,
+          marginTop: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
         }}>
           ⚠️ {warnings.join(", ")}
         </div>
@@ -189,27 +193,27 @@ export default function GolfConditions({ placeId, date, tee }) {
         <div style={{ 
           marginTop: 12, 
           paddingTop: 12, 
-          borderTop: "1px solid var(--color-border-subtle)",
+          borderTop: "1px solid var(--color-border)",
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: "8px 16px",
+          gap: "10px 20px",
           fontSize: 13,
         }}>
           <div>
-            <span style={{ color: "var(--color-text-muted)" }}>Temperature</span>
-            <div style={{ fontWeight: 500 }}>{temp}°C</div>
+            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Temperature</div>
+            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{temp}°C</div>
           </div>
           <div>
-            <span style={{ color: "var(--color-text-muted)" }}>Rain chance</span>
-            <div style={{ fontWeight: 500 }}>{rain}%</div>
+            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Rain chance</div>
+            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{rain}%</div>
           </div>
           <div>
-            <span style={{ color: "var(--color-text-muted)" }}>Wind</span>
-            <div style={{ fontWeight: 500 }}>{wind} km/h</div>
+            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Wind</div>
+            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{wind} km/h</div>
           </div>
           <div>
-            <span style={{ color: "var(--color-text-muted)" }}>Cloud cover</span>
-            <div style={{ fontWeight: 500 }}>{cloud}%</div>
+            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Cloud cover</div>
+            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{cloud}%</div>
           </div>
         </div>
       )}

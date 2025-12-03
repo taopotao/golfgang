@@ -24,7 +24,7 @@ export default function Admin() {
   }, []);
 
   const deleteEvent = async (id) => {
-    if (!confirm("Really delete this event?")) return;
+    if (!confirm("Delete this event?")) return;
     await deleteDoc(doc(db, "events", id));
     setEvents((prev) => prev.filter((e) => e.id !== id));
   };
@@ -40,8 +40,8 @@ export default function Admin() {
   if (loading) {
     return (
       <div className="page">
-        <div className="card">
-          <p>Loading admin tools…</p>
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          Loading…
         </div>
       </div>
     );
@@ -49,31 +49,29 @@ export default function Admin() {
 
   return (
     <div className="page">
-
-      {/* Page Header */}
       <div className="page-header">
         <div className="page-header-title">
-          <h1>Admin Panel</h1>
-          <p>Manage events, users, and admin privileges.</p>
+          <h1>Admin</h1>
+          <p>Manage events and users</p>
         </div>
       </div>
 
-
-      {/* EVENTS SECTION */}
-      <div className="card" style={{ marginBottom: 28 }}>
-
-        <div className="card-header">
-          <div className="card-title-group">
-            <h3 className="card-title">Events</h3>
-            <p className="card-subtitle">Manage all scheduled rounds</p>
-          </div>
+      {/* EVENTS */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="section-header">
+          <span className="section-title">Events</span>
+          <span className="section-count">{events.length}</span>
         </div>
 
-        <div className="card-body" style={{ paddingTop: 0 }}>
-          {events.map((ev, idx) => {
+        {events.length === 0 ? (
+          <p style={{ color: "var(--color-text-secondary)", padding: "12px 0" }}>
+            No events yet
+          </p>
+        ) : (
+          events.map((ev, idx) => {
             const dateString = ev.date?.toDate?.().toLocaleString("en-AU", {
-              weekday: "long",
-              month: "long",
+              weekday: "short",
+              month: "short",
               day: "numeric",
               hour: "2-digit",
               minute: "2-digit",
@@ -86,108 +84,87 @@ export default function Admin() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  padding: "14px 0",
-                  borderBottom:
-                    idx < events.length - 1
-                      ? "1px solid var(--color-border-subtle)"
-                      : "none",
+                  padding: "12px 0",
+                  borderBottom: idx < events.length - 1 ? "1px solid var(--color-divider)" : "none",
+                  gap: 12,
                 }}
               >
-                {/* LEFT SIDE: Title + date */}
-             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-    <span style={{ fontWeight: 600, fontSize: 15 }}>{ev.title}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontWeight: 500 }}>{ev.title}</span>
+                    <span className={`status-badge ${ev.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
+                      {ev.booked ? "Booked" : "Proposed"}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                    {dateString}
+                  </span>
+                </div>
 
-    <span
-      className={`event-status-badge ${
-        ev.booked ? "event-status-booked" : "event-status-proposed"
-      }`}
-    >
-      {ev.booked ? "Booked" : "Proposed"}
-    </span>
-  </div>
-
-  <span className="text-soft" style={{ fontSize: 13 }}>
-    {dateString}
-  </span>
-</div>
-
-
-                {/* RIGHT SIDE: Buttons */}
-                <div style={{ display: "flex", gap: 10 }}>
-                  <Link to={`/event/${ev.id}`} className="btn btn-primary btn-sm">
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <Link to={`/event/${ev.id}`} className="btn btn-ghost btn-sm">
                     Open
                   </Link>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => deleteEvent(ev.id)}
-                  >
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--color-danger)" }} onClick={() => deleteEvent(ev.id)}>
                     Delete
                   </button>
                 </div>
               </div>
             );
-          })}
-        </div>
+          })
+        )}
       </div>
 
-
-      {/* USERS SECTION */}
+      {/* USERS */}
       <div className="card">
-        <div className="card-header">
-          <div className="card-title-group">
-            <h3 className="card-title">Users</h3>
-            <p className="card-subtitle">Manage member privileges</p>
-          </div>
+        <div className="section-header">
+          <span className="section-title">Users</span>
+          <span className="section-count">{users.length}</span>
         </div>
 
-        <div className="card-body" style={{ paddingTop: 0 }}>
-          {users.map((u, idx) => (
-            <div
-              key={u.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "14px 0",
-                borderBottom:
-                  idx < users.length - 1
-                    ? "1px solid var(--color-border-subtle)"
-                    : "none",
-              }}
-            >
-              {/* USER EMAIL + role badge */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 15 }}>{u.email}</span>
-
+        {users.map((u, idx) => (
+          <div
+            key={u.id}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "12px 0",
+              borderBottom: idx < users.length - 1 ? "1px solid var(--color-divider)" : "none",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div className="avatar">
+                {(u.username || u.email || "?").charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <span style={{ fontWeight: 500 }}>{u.username || u.email}</span>
                 {u.isAdmin && (
-                  <span
-                    style={{
-                      background: "var(--color-primary-soft)",
-                      padding: "2px 8px",
-                      borderRadius: "var(--radius-pill)",
-                      fontSize: 11,
-                      color: "var(--color-primary)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    admin
+                  <span style={{
+                    marginLeft: 8,
+                    fontSize: 11,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    background: "var(--color-primary-soft)",
+                    color: "var(--color-primary)",
+                    fontWeight: 500,
+                  }}>
+                    Admin
                   </span>
                 )}
               </div>
-
-              {/* ACTION BUTTON */}
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => toggleAdmin(u.id, u.isAdmin)}
-              >
-                {u.isAdmin ? "Remove Admin" : "Make Admin"}
-              </button>
             </div>
-          ))}
-        </div>
-      </div>
 
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => toggleAdmin(u.id, u.isAdmin)}
+            >
+              {u.isAdmin ? "Remove Admin" : "Make Admin"}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

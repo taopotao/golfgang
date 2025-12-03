@@ -5,6 +5,9 @@ import { auth } from "../firebase";
 import { useTheme } from "../providers/ThemeProvider";
 import { useState } from "react";
 
+// Use Vite's base URL for assets
+const basePath = import.meta.env.BASE_URL || '/';
+
 export default function Navbar() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -26,11 +29,16 @@ export default function Navbar() {
         <div className="top-nav-inner">
           {/* LEFT — Brand */}
           <Link to="/" className="top-nav-left" style={{ textDecoration: 'none' }}>
-            <div className="brand-mark" />
-            <div className="brand-title">
-              <span className="brand-title-main">GolfGang</span>
-              <span className="brand-title-sub">Tee Time Planner</span>
-            </div>
+            <img 
+              src={`${basePath}logo.png`}
+              alt="GolfGang" 
+              className="brand-logo"
+              style={{
+                height: 40,
+                width: 'auto',
+                objectFit: 'contain',
+              }}
+            />
           </Link>
 
           {/* RIGHT — Desktop menu */}

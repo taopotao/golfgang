@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
-import { getMessaging } from 'firebase/messaging';
+import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAUNktXGZeeXlX3LKFolXZRVQZGDohlIF0",
@@ -17,14 +17,19 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 export const db = getFirestore(app)
-// Initialize messaging (only in browser, not during SSR)
+export { app }
+
+// Initialize messaging only if supported
 let messaging = null;
-if (typeof window !== 'undefined') {
-  try {
+
+export const getMessagingInstance = async () => {
+  if (messaging) return messaging;
+  
+  const supported = await isSupported();
+  if (supported) {
     messaging = getMessaging(app);
-  } catch (error) {
-    console.log('Messaging not supported:', error);
   }
-}
+  return messaging;
+};
 
 export { messaging };

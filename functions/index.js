@@ -5,6 +5,7 @@
 
 const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const {getMessaging} = require("firebase-admin/messaging");
@@ -69,7 +70,7 @@ async function getTokensForUsers(userIds) {
 async function sendNotification(tokens, notification, data) {
     if (!tokens.length) {
         console.log("No tokens to send to");
-        return;
+        return { successCount: 0, failureCount: 0 };
     }
 
     const message = {
@@ -101,8 +102,11 @@ async function sendNotification(tokens, notification, data) {
         if (response.failureCount > 0) {
             console.log("Failed: " + response.failureCount + " notifications");
         }
+        
+        return { successCount: response.successCount, failureCount: response.failureCount };
     } catch (error) {
         console.error("Error sending notifications:", error);
+        return { successCount: 0, failureCount: tokens.length };
     }
 }
 
@@ -290,4 +294,85 @@ exports.sendRsvpReminders = onSchedule({
             {eventId: eventId, type: "rsvp_reminder"},
         );
     }
+});
+
+// 4. Manual RSVP reminder trigger (callable by admins)
+exports.triggerRsvpReminder = onCall(async (request) => {
+    // Optional: Check if user is authenticated
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in to send reminders');
+    }
+
+    const eventId = request.data.eventId;
+    
+    if (!eventId) {
+        throw new HttpsError('invalid-argument', 'Event ID is required');
+    }
+
+    console.log("Manual RSVP reminder triggered for event: " + eventId);
+
+    const eventDoc = await db.collection("events").doc(eventId).get();
+    
+    if (!eventDoc.exists) {
+        throw new HttpsError('not-found', 'Event not found');
+    }
+
+    const eventData = eventDoc.data();
+    
+    // Don't send reminders for booked events
+    if (eventData.booked) {
+        throw new HttpsError('failed-precondition', 'Cannot send reminders for booked events');
+    }
+
+    const responses = eventData.responses || {};
+
+    // Get all users who haven't responded
+    const allUsersSnapshot = await db.collection("users")
+        .where("notificationsEnabled", "==", true)
+        .get();
+
+    const nonResponderTokens = [];
+    const nonResponderCount = { total: 0, withTokens: 0 };
+
+    allUsersSnapshot.forEach((userDoc) => {
+        // User hasn't responded (no entry in responses)
+        if (!responses[userDoc.id]) {
+            nonResponderCount.total++;
+            const userData = userDoc.data();
+            if (userData.fcmTokens && userData.fcmTokens.length > 0) {
+                nonResponderTokens.push(...userData.fcmTokens);
+                nonResponderCount.withTokens++;
+            }
+        }
+    });
+
+    if (nonResponderTokens.length === 0) {
+        return { 
+            success: true, 
+            message: "No users to notify (everyone has responded or notifications disabled)",
+            usersNotified: 0
+        };
+    }
+
+    const uniqueTokens = [...new Set(nonResponderTokens)];
+    const msg = NOTIFICATION_MESSAGES.rsvpReminder;
+    const title = eventData.title || "the golf round";
+
+    const result = await sendNotification(
+        uniqueTokens,
+        {
+            title: msg.title,
+            body: msg.bodyTemplate.replace("{eventTitle}", title),
+        },
+        { eventId: eventId, type: "rsvp_reminder_manual" }
+    );
+
+    console.log(`Sent ${result.successCount} reminders for event ${eventId}`);
+
+    return { 
+        success: true, 
+        message: `Sent reminders to ${result.successCount} user(s)`,
+        usersNotified: result.successCount,
+        usersFailed: result.failureCount
+    };
 });

@@ -1,22 +1,20 @@
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, app } from '../firebase';
 
-// VAPID key for web push (you'll get this from Firebase Console)
-// Go to: Project Settings > Cloud Messaging > Web Push certificates
 const VAPID_KEY = 'BOjFZAtY_oM-ci1cnb3p5sT23gsjbwZo4kINDrd-QFSIMk4zDL89q12PHLyh-_16BWitVjsk9UsNKuUPBuXTrT0';
 
 let messaging = null;
 
-// Initialize messaging (call this after Firebase is initialized)
-export const initializeMessaging = (firebaseApp) => {
-  try {
-    messaging = getMessaging(firebaseApp);
-    return messaging;
-  } catch (error) {
-    console.error('Failed to initialize messaging:', error);
-    return null;
+// Get or initialize messaging
+const getMessagingInstance = async () => {
+  if (messaging) return messaging;
+  
+  const supported = await isSupported();
+  if (supported) {
+    messaging = getMessaging(app);
   }
+  return messaging;
 };
 
 // Check if notifications are supported
@@ -29,7 +27,7 @@ export const isNotificationsSupported = () => {
 // Get current permission status
 export const getNotificationPermission = () => {
   if (!isNotificationsSupported()) return 'unsupported';
-  return Notification.permission; // 'granted', 'denied', or 'default'
+  return Notification.permission;
 };
 
 // Request notification permission and get FCM token
@@ -48,24 +46,37 @@ export const requestNotificationPermission = async (userId) => {
       return { success: false, error: 'permission_denied' };
     }
 
+    // Get the base path from Vite's config or default to root
+    const basePath = import.meta.env.BASE_URL || '/';
+    
     // Register service worker
-    const basePath = '/golfgang'; // or use your build tool's base path config
-    const registration = await navigator.serviceWorker.register(`${basePath}/firebase-messaging-sw.js`, { 
-  scope: `${basePath}/` 
-});
+    const swPath = `${basePath}firebase-messaging-sw.js`.replace('//', '/');
+    console.log('Registering service worker at:', swPath);
+    
+    const registration = await navigator.serviceWorker.register(swPath, { 
+      scope: basePath 
+    });
+    
+    console.log('Service worker registered:', registration);
 
-    // Get FCM token
-    if (!messaging) {
-      return { success: false, error: 'messaging_not_initialized' };
+    // Wait for the service worker to be ready
+    await navigator.serviceWorker.ready;
+    console.log('Service worker ready');
+
+    // Get messaging instance
+    const messagingInstance = await getMessagingInstance();
+    if (!messagingInstance) {
+      console.error('Messaging not supported');
+      return { success: false, error: 'messaging_not_supported' };
     }
 
-    const token = await getToken(messaging, {
+    const token = await getToken(messagingInstance, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: registration
     });
 
     if (token) {
-      console.log('FCM Token:', token);
+      console.log('FCM Token obtained:', token.substring(0, 20) + '...');
       
       // Save token to user's Firestore document
       await saveTokenToUser(userId, token);
@@ -113,33 +124,81 @@ export const removeNotificationToken = async (userId, token) => {
 };
 
 // Listen for foreground messages
-export const onForegroundMessage = (callback) => {
-  if (!messaging) return () => {};
+export const onForegroundMessage = async (callback) => {
+  const messagingInstance = await getMessagingInstance();
+  if (!messagingInstance) return () => {};
   
-  return onMessage(messaging, (payload) => {
+  return onMessage(messagingInstance, (payload) => {
     console.log('📬 Foreground message received:', payload);
     
-    // Show a toast/notification in the app
     if (callback) {
       callback(payload);
     }
     
-    // Optionally show browser notification even when app is open
-    if (Notification.permission === 'granted') {
-      const { title, body } = payload.notification || {};
-      new Notification(title || 'GolfGang', {
-        body: body || 'You have a new notification',
-        tag: payload.data?.eventId || 'golfgang-foreground'
-      });
-    }
+    showNotificationViaServiceWorker(payload);
   });
 };
 
-// Test notification (for debugging)
-export const sendTestNotification = () => {
-  if (Notification.permission === 'granted') {
-    new Notification('🏌️ GolfGang Test', {
-      body: 'Push notifications are working! 🎉',
+// Helper to show notification via service worker
+const showNotificationViaServiceWorker = async (payload) => {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const { title, body } = payload.notification || {};
+    
+    await registration.showNotification(title || 'GolfGang', {
+      body: body || 'You have a new notification',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: payload.data?.eventId || 'golfgang-notification',
+      data: payload.data,
+      vibrate: [200, 100, 200],
     });
+  } catch (error) {
+    console.error('Failed to show notification via SW:', error);
+  }
+};
+
+// Test notification
+export const sendTestNotification = async () => {
+  console.log('sendTestNotification called');
+  console.log('Notification.permission:', Notification.permission);
+  
+  if (Notification.permission !== 'granted') {
+    console.log('Notification permission not granted');
+    alert('Notification permission not granted. Please enable notifications first.');
+    return;
+  }
+
+  try {
+    if (!('serviceWorker' in navigator)) {
+      console.error('Service Worker not supported');
+      alert('Service Worker not supported in this browser');
+      return;
+    }
+
+    console.log('Waiting for service worker to be ready...');
+    const registration = await navigator.serviceWorker.ready;
+    console.log('Service worker ready:', registration);
+    
+    if (!registration) {
+      console.error('No service worker registration found');
+      alert('Service worker not ready. Please refresh and try again.');
+      return;
+    }
+
+    console.log('Sending notification via service worker...');
+    await registration.showNotification('🏌️ GolfGang Test', {
+      body: 'Push notifications are working! 🎉',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: 'test-notification-' + Date.now(),
+      vibrate: [200, 100, 200],
+      requireInteraction: false,
+    });
+    
+    console.log('Test notification sent successfully');
+  } catch (error) {
+    console.error('Failed to send test notification:', error);
+    alert(`Failed to send notification: ${error.message}`);
   }
 };
