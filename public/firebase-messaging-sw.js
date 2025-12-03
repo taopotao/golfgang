@@ -49,23 +49,31 @@ self.addEventListener('notificationclick', (event) => {
 
   // Get the event URL from notification data
   const eventId = event.notification.data?.eventId;
-  const urlToOpen = eventId ? `/event/${eventId}` : '/';
+  
+  // Build absolute URL using the service worker's origin
+  const basePath = self.location.pathname.replace('firebase-messaging-sw.js', '');
+  const pathToOpen = eventId ? `event/${eventId}` : '';
+  const absoluteUrl = new URL(basePath + pathToOpen, self.location.origin).href;
+  
+  console.log('[firebase-messaging-sw.js] Opening URL:', absoluteUrl);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Check if there's already a window open
+      // Check if there's already a window open with our app
       for (const client of windowClients) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.focus();
-          if (eventId) {
-            client.navigate(urlToOpen);
-          }
-          return;
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          // Focus the existing window
+          return client.focus().then((focusedClient) => {
+            // Navigate to the event page if we have an eventId
+            if (eventId && focusedClient.navigate) {
+              return focusedClient.navigate(absoluteUrl);
+            }
+          });
         }
       }
-      // If no window is open, open a new one
+      // If no window is open, open a new one with the absolute URL
       if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+        return clients.openWindow(absoluteUrl);
       }
     })
   );
