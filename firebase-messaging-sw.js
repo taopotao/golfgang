@@ -1,16 +1,15 @@
-// Firebase Cloud Messaging Service Worker
-// This runs in the background to receive push notifications
+// Firebase Messaging Service Worker
+// This file MUST be in your public folder (e.g., /public/firebase-messaging-sw.js)
 
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 // Initialize Firebase in the service worker
-// Note: You'll need to replace these with your actual Firebase config
 firebase.initializeApp({
   apiKey: "AIzaSyAUNktXGZeeXlX3LKFolXZRVQZGDohlIF0",
   authDomain: "golfgang-79922.firebaseapp.com",
   projectId: "golfgang-79922",
-  storageBucket: "golfgang-79922.firebasestorage.app",
+  storageBucket: "golfgang-79922.appspot.com",
   messagingSenderId: "223762413770",
   appId: "1:223762413770:web:098607b8f30080df90dc33",
   measurementId: "G-T1FXETH3K0"
@@ -20,53 +19,66 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
-  console.log('📬 Background message received:', payload);
+  console.log('[firebase-messaging-sw.js] Received background message:', payload);
 
   const notificationTitle = payload.notification?.title || 'GolfGang';
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new notification',
+    icon: '/logo192.png',
+    badge: '/logo192.png',
     tag: payload.data?.eventId || 'golfgang-notification',
     data: payload.data,
-    actions: [
-      { action: 'view', title: 'View Event' },
-      { action: 'dismiss', title: 'Dismiss' }
-    ],
     vibrate: [200, 100, 200],
-    requireInteraction: true
+    requireInteraction: true,
+    actions: [
+      {
+        action: 'open',
+        title: 'View Event'
+      }
+    ]
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Handle notification clicks
+// Handle notification click
 self.addEventListener('notificationclick', (event) => {
-  console.log('🖱️ Notification clicked:', event);
+  console.log('[firebase-messaging-sw.js] Notification click:', event);
   
   event.notification.close();
 
-  if (event.action === 'dismiss') {
-    return;
-  }
-
-  // Open the event page if we have an eventId
+  // Get the event URL from notification data
   const eventId = event.notification.data?.eventId;
-  const urlToOpen = eventId 
-    ? `${self.location.origin}/event/${eventId}`
-    : self.location.origin;
+  const urlToOpen = eventId ? `/event/${eventId}` : '/';
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((windowClients) => {
-        // Check if there's already a window open
-        for (const client of windowClients) {
-          if (client.url === urlToOpen && 'focus' in client) {
-            return client.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Check if there's already a window open
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus();
+          if (eventId) {
+            client.navigate(urlToOpen);
           }
+          return;
         }
-        // Open new window if none exists
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
+      }
+      // If no window is open, open a new one
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
   );
+});
+
+// Log when service worker is installed
+self.addEventListener('install', (event) => {
+  console.log('[firebase-messaging-sw.js] Service worker installed');
+  self.skipWaiting();
+});
+
+// Log when service worker is activated
+self.addEventListener('activate', (event) => {
+  console.log('[firebase-messaging-sw.js] Service worker activated');
+  event.waitUntil(clients.claim());
 });
