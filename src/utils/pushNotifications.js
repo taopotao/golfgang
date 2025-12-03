@@ -124,6 +124,9 @@ export const removeNotificationToken = async (userId, token) => {
 };
 
 // Listen for foreground messages
+// NOTE: Firebase automatically shows the notification when the message contains a 'notification' payload.
+// We only need to handle additional UI updates here (like showing an in-app toast).
+// DO NOT manually show a notification here to avoid duplicates.
 export const onForegroundMessage = async (callback) => {
   const messagingInstance = await getMessagingInstance();
   if (!messagingInstance) return () => {};
@@ -131,34 +134,18 @@ export const onForegroundMessage = async (callback) => {
   return onMessage(messagingInstance, (payload) => {
     console.log('📬 Foreground message received:', payload);
     
+    // Call the callback for any in-app UI updates (e.g., showing a toast, updating a badge)
     if (callback) {
       callback(payload);
     }
     
-    showNotificationViaServiceWorker(payload);
+    // DO NOT call showNotificationViaServiceWorker here!
+    // Firebase FCM already shows the notification automatically when there's a 'notification' payload.
+    // Manually showing another notification causes duplicates.
   });
 };
 
-// Helper to show notification via service worker
-const showNotificationViaServiceWorker = async (payload) => {
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    const { title, body } = payload.notification || {};
-    
-    await registration.showNotification(title || 'GolfGang', {
-      body: body || 'You have a new notification',
-      icon: '/logo192.png',
-      badge: '/logo192.png',
-      tag: payload.data?.eventId || 'golfgang-notification',
-      data: payload.data,
-      vibrate: [200, 100, 200],
-    });
-  } catch (error) {
-    console.error('Failed to show notification via SW:', error);
-  }
-};
-
-// Test notification
+// Test notification - this is fine because it's manually triggered and not from FCM
 export const sendTestNotification = async () => {
   console.log('sendTestNotification called');
   console.log('Notification.permission:', Notification.permission);
