@@ -5,9 +5,6 @@ import { auth } from "../firebase";
 import { useTheme } from "../providers/ThemeProvider";
 import { useState } from "react";
 
-// Use Vite's base URL for assets
-const basePath = import.meta.env.BASE_URL || '/';
-
 export default function Navbar() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -25,27 +22,56 @@ export default function Navbar() {
 
   return (
     <>
+      <style>{`
+        .nav-desktop {
+          display: flex;
+        }
+        .nav-mobile-burger {
+          display: none;
+        }
+        @media (max-width: 768px) {
+          .nav-desktop {
+            display: none !important;
+          }
+          .nav-mobile-burger {
+            display: flex !important;
+          }
+          .mobile-menu-overlay {
+            display: flex;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-menu-overlay {
+            display: none !important;
+          }
+        }
+      `}</style>
+      
       <header className="top-nav">
         <div className="top-nav-inner">
-          {/* LEFT — Brand */}
-          <Link to="/" className="top-nav-left" style={{ textDecoration: 'none' }}>
-            <img 
-              src={`${basePath}logo.png`}
-              alt="GolfGang" 
-              className="brand-logo"
-              style={{
-                height: 40,
-                width: 'auto',
-                objectFit: 'contain',
-              }}
-            />
+          {/* LEFT — Brand Title */}
+          <Link 
+            to="/" 
+            className="top-nav-left" 
+            style={{ 
+              textDecoration: 'none',
+              fontSize: '1.5rem',
+              fontWeight: 700,
+              color: 'var(--color-primary, #2d6a4f)',
+            }}
+          >
+            GolfGang
           </Link>
 
           {/* RIGHT — Desktop menu */}
-          <div className="top-nav-right desktop-only nav-desktop">
+          <div className="top-nav-right nav-desktop" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+          }}>
             {user && (
               <>
-                <nav className="top-nav-links">
+                <nav className="top-nav-links" style={{ display: 'flex', gap: 16 }}>
                   <Link to="/" className={location.pathname === "/" ? "active" : undefined}>
                     Calendar
                   </Link>
@@ -88,16 +114,17 @@ export default function Navbar() {
           {/* MOBILE HAMBURGER BUTTON */}
           {user && (
             <button
-              className="mobile-only"
+              className="nav-mobile-burger"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               style={{
                 background: 'none',
                 border: 'none',
                 padding: 8,
                 cursor: 'pointer',
-                display: 'flex',
                 flexDirection: 'column',
                 gap: 5,
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               aria-label="Menu"
             >
@@ -105,7 +132,7 @@ export default function Navbar() {
                 display: 'block',
                 width: 22,
                 height: 2,
-                background: 'var(--color-text-main)',
+                background: 'var(--color-text-main, #333)',
                 borderRadius: 2,
                 transition: 'all 0.2s ease',
                 transform: mobileMenuOpen ? 'rotate(45deg) translateY(7px)' : 'none',
@@ -114,7 +141,7 @@ export default function Navbar() {
                 display: 'block',
                 width: 22,
                 height: 2,
-                background: 'var(--color-text-main)',
+                background: 'var(--color-text-main, #333)',
                 borderRadius: 2,
                 transition: 'all 0.2s ease',
                 opacity: mobileMenuOpen ? 0 : 1,
@@ -123,7 +150,7 @@ export default function Navbar() {
                 display: 'block',
                 width: 22,
                 height: 2,
-                background: 'var(--color-text-main)',
+                background: 'var(--color-text-main, #333)',
                 borderRadius: 2,
                 transition: 'all 0.2s ease',
                 transform: mobileMenuOpen ? 'rotate(-45deg) translateY(-7px)' : 'none',
@@ -136,17 +163,16 @@ export default function Navbar() {
       {/* MOBILE MENU - Full screen overlay */}
       {mobileMenuOpen && (
         <div 
-          className="mobile-only"
+          className="mobile-menu-overlay"
           style={{
             position: 'fixed',
-            top: 'var(--nav-height)',
+            top: 'var(--nav-height, 60px)',
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'var(--color-bg)',
+            background: 'var(--color-bg, #fff)',
             zIndex: 100,
             padding: 20,
-            display: 'flex',
             flexDirection: 'column',
             gap: 8,
             overflowY: 'auto',
@@ -157,13 +183,13 @@ export default function Navbar() {
               {/* User info */}
               <div style={{
                 padding: '16px 0',
-                borderBottom: '1px solid var(--color-border-subtle)',
+                borderBottom: '1px solid var(--color-border-subtle, #eee)',
                 marginBottom: 8,
               }}>
                 <div style={{ fontWeight: 600, fontSize: 16 }}>
                   {user.email?.split('@')[0]}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted, #666)' }}>
                   {user.email}
                   {isAdmin && ' • Admin'}
                 </div>
@@ -179,7 +205,7 @@ export default function Navbar() {
                   gap: 12,
                   padding: '14px 0',
                   textDecoration: 'none',
-                  color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text-main)',
+                  color: location.pathname === '/' ? 'var(--color-primary, #2d6a4f)' : 'var(--color-text-main, #333)',
                   fontSize: 16,
                   fontWeight: 500,
                 }}
@@ -196,7 +222,7 @@ export default function Navbar() {
                   gap: 12,
                   padding: '14px 0',
                   textDecoration: 'none',
-                  color: location.pathname === '/profile' ? 'var(--color-primary)' : 'var(--color-text-main)',
+                  color: location.pathname === '/profile' ? 'var(--color-primary, #2d6a4f)' : 'var(--color-text-main, #333)',
                   fontSize: 16,
                   fontWeight: 500,
                 }}
@@ -214,7 +240,7 @@ export default function Navbar() {
                     gap: 12,
                     padding: '14px 0',
                     textDecoration: 'none',
-                    color: location.pathname.startsWith('/admin') ? 'var(--color-primary)' : 'var(--color-text-main)',
+                    color: location.pathname.startsWith('/admin') ? 'var(--color-primary, #2d6a4f)' : 'var(--color-text-main, #333)',
                     fontSize: 16,
                     fontWeight: 500,
                   }}
@@ -229,7 +255,7 @@ export default function Navbar() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '14px 0',
-                borderTop: '1px solid var(--color-border-subtle)',
+                borderTop: '1px solid var(--color-border-subtle, #eee)',
                 marginTop: 8,
               }}>
                 <span style={{ fontSize: 16, fontWeight: 500 }}>
@@ -239,12 +265,12 @@ export default function Navbar() {
                   onClick={toggleTheme}
                   style={{
                     padding: '8px 16px',
-                    background: 'var(--color-surface-soft)',
-                    border: '1px solid var(--color-border-subtle)',
+                    background: 'var(--color-surface-soft, #f5f5f5)',
+                    border: '1px solid var(--color-border-subtle, #eee)',
                     borderRadius: 8,
                     cursor: 'pointer',
                     fontSize: 14,
-                    color: 'var(--color-text-main)',
+                    color: 'var(--color-text-main, #333)',
                   }}
                 >
                   Switch
@@ -263,7 +289,7 @@ export default function Navbar() {
                   border: 'none',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  color: 'var(--color-danger)',
+                  color: 'var(--color-danger, #dc3545)',
                   fontSize: 16,
                   fontWeight: 500,
                   width: '100%',
