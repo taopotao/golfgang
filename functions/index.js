@@ -62,10 +62,11 @@ async function getTokensForUsers(userIds) {
 
 /**
  * Send notification to multiple tokens
+ * Uses data-only message to let service worker handle display (prevents duplicates)
  * @param {Array} tokens - Array of FCM tokens
  * @param {Object} notification - Notification object with title and body
  * @param {Object} data - Additional data to send
- * @return {Promise<void>}
+ * @return {Promise<Object>}
  */
 async function sendNotification(tokens, notification, data) {
     if (!tokens.length) {
@@ -73,22 +74,19 @@ async function sendNotification(tokens, notification, data) {
         return { successCount: 0, failureCount: 0 };
     }
 
+    // Use data-only message - the service worker will handle displaying the notification
+    // This prevents duplicate notifications from both FCM and our service worker
     const message = {
-        notification: {
+        data: {
             title: notification.title,
             body: notification.body,
-        },
-        data: Object.assign({}, data, {
+            eventId: data.eventId || '',
+            type: data.type || '',
             click_action: "FLUTTER_NOTIFICATION_CLICK",
-        }),
+        },
         tokens: tokens,
+        // Only include webpush for web-specific settings, but NOT notification payload
         webpush: {
-            notification: {
-                icon: "/logo192.png",
-                badge: "/logo192.png",
-                vibrate: [200, 100, 200],
-                requireInteraction: true,
-            },
             fcmOptions: {
                 link: data.eventId ? "/event/" + data.eventId : "/",
             },
@@ -101,6 +99,12 @@ async function sendNotification(tokens, notification, data) {
 
         if (response.failureCount > 0) {
             console.log("Failed: " + response.failureCount + " notifications");
+            // Log individual failures for debugging
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    console.error("Failed to send to token " + idx + ":", resp.error);
+                }
+            });
         }
         
         return { successCount: response.successCount, failureCount: response.failureCount };

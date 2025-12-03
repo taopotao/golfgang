@@ -124,9 +124,7 @@ export const removeNotificationToken = async (userId, token) => {
 };
 
 // Listen for foreground messages
-// NOTE: Firebase automatically shows the notification when the message contains a 'notification' payload.
-// We only need to handle additional UI updates here (like showing an in-app toast).
-// DO NOT manually show a notification here to avoid duplicates.
+// For data-only messages, we need to manually show the notification
 export const onForegroundMessage = async (callback) => {
   const messagingInstance = await getMessagingInstance();
   if (!messagingInstance) return () => {};
@@ -139,10 +137,31 @@ export const onForegroundMessage = async (callback) => {
       callback(payload);
     }
     
-    // DO NOT call showNotificationViaServiceWorker here!
-    // Firebase FCM already shows the notification automatically when there's a 'notification' payload.
-    // Manually showing another notification causes duplicates.
+    // For data-only messages (no notification payload), we need to show the notification manually
+    // Check if this is a data-only message
+    if (!payload.notification && payload.data) {
+      showNotificationFromData(payload.data);
+    }
+    // If payload.notification exists, FCM will auto-show it, so we don't do anything
   });
+};
+
+// Helper to show notification from data payload
+const showNotificationFromData = async (data) => {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    
+    await registration.showNotification(data.title || 'GolfGang', {
+      body: data.body || 'You have a new notification',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: data.eventId || 'golfgang-notification-' + Date.now(),
+      data: data,
+      vibrate: [200, 100, 200],
+    });
+  } catch (error) {
+    console.error('Failed to show notification:', error);
+  }
 };
 
 // Test notification - this is fine because it's manually triggered and not from FCM

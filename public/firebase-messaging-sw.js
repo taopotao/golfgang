@@ -17,16 +17,19 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages
+// Handle background messages (data-only messages)
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
 
-  const notificationTitle = payload.notification?.title || 'GolfGang';
+  // For data-only messages, get title/body from data payload
+  const notificationTitle = payload.data?.title || payload.notification?.title || 'GolfGang';
+  const notificationBody = payload.data?.body || payload.notification?.body || 'You have a new notification';
+  
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new notification',
+    body: notificationBody,
     icon: '/logo192.png',
     badge: '/logo192.png',
-    tag: payload.data?.eventId || 'golfgang-notification',
+    tag: payload.data?.eventId || 'golfgang-notification-' + Date.now(),
     data: payload.data,
     vibrate: [200, 100, 200],
     requireInteraction: true,
