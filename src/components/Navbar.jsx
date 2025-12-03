@@ -2,14 +2,12 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../providers/AuthProvider";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
-import { useTheme } from "../providers/ThemeProvider";
 import { useState } from "react";
 
 export default function Navbar() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
   
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -84,15 +82,6 @@ export default function Navbar() {
                     </Link>
                   )}
                 </nav>
-
-                <button onClick={toggleTheme} className="theme-toggle-btn">
-                  <div
-                    className="theme-toggle-thumb"
-                    style={{ left: theme === "dark" ? 30 : 3 }}
-                  />
-                  <span>☀️</span>
-                  <span>🌙</span>
-                </button>
 
                 <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm">
                   Profile
@@ -248,34 +237,6 @@ export default function Navbar() {
                   ⚙️ Admin
                 </Link>
               )}
-
-              {/* Theme toggle */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 0',
-                borderTop: '1px solid var(--color-border-subtle, #eee)',
-                marginTop: 8,
-              }}>
-                <span style={{ fontSize: 16, fontWeight: 500 }}>
-                  {theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}
-                </span>
-                <button 
-                  onClick={toggleTheme}
-                  style={{
-                    padding: '8px 16px',
-                    background: 'var(--color-surface-soft, #f5f5f5)',
-                    border: '1px solid var(--color-border-subtle, #eee)',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    fontSize: 14,
-                    color: 'var(--color-text-main, #333)',
-                  }}
-                >
-                  Switch
-                </button>
-              </div>
 
               {/* Logout */}
               <button 
