@@ -13,6 +13,7 @@ export default function RSVPPreferencesModal({ isOpen, onClose, onSubmit, existi
   const [preferences, setPreferences] = useState({
     transport: existingPreferences.transport || null, // 'cart' | 'walk' | null
     format: existingPreferences.format || null, // 'scramble' | 'stroke' | null
+    teeTime: existingPreferences.teeTime || null, // 'morning' | 'midday' | 'twilight' | null
     coursePreference: existingPreferences.coursePreference || "",
   });
   const [saving, setSaving] = useState(false);
@@ -155,6 +156,84 @@ export default function RSVPPreferencesModal({ isOpen, onClose, onSubmit, existi
             >
               <span style={{ fontSize: 24 }}>🏌️</span>
               <span style={{ fontSize: 13, fontWeight: 500 }}>Stroke Play</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tee time preference */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ 
+            display: "block", 
+            fontSize: 13, 
+            fontWeight: 500, 
+            marginBottom: 8,
+            color: "var(--color-text)",
+          }}>
+            Preferred tee time?
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setPreferences(p => ({ ...p, teeTime: p.teeTime === 'morning' ? null : 'morning' }))}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: `2px solid ${preferences.teeTime === 'morning' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                background: preferences.teeTime === 'morning' ? 'var(--color-primary-soft)' : 'var(--color-surface)',
+                color: preferences.teeTime === 'morning' ? 'var(--color-primary)' : 'var(--color-text)',
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🌅</span>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>Morning</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreferences(p => ({ ...p, teeTime: p.teeTime === 'midday' ? null : 'midday' }))}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: `2px solid ${preferences.teeTime === 'midday' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                background: preferences.teeTime === 'midday' ? 'var(--color-primary-soft)' : 'var(--color-surface)',
+                color: preferences.teeTime === 'midday' ? 'var(--color-primary)' : 'var(--color-text)',
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>☀️</span>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>Midday</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreferences(p => ({ ...p, teeTime: p.teeTime === 'twilight' ? null : 'twilight' }))}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: `2px solid ${preferences.teeTime === 'twilight' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                background: preferences.teeTime === 'twilight' ? 'var(--color-primary-soft)' : 'var(--color-surface)',
+                color: preferences.teeTime === 'twilight' ? 'var(--color-primary)' : 'var(--color-text)',
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🌇</span>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>Twilight</span>
             </button>
           </div>
         </div>

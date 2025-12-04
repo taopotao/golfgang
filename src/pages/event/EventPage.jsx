@@ -777,9 +777,12 @@ export default function EventPage() {
               const walkCount = allPrefs.filter(p => p.transport === 'walk').length;
               const scrambleCount = allPrefs.filter(p => p.format === 'scramble').length;
               const strokeCount = allPrefs.filter(p => p.format === 'stroke').length;
+              const morningCount = allPrefs.filter(p => p.teeTime === 'morning').length;
+              const middayCount = allPrefs.filter(p => p.teeTime === 'midday').length;
+              const twilightCount = allPrefs.filter(p => p.teeTime === 'twilight').length;
               const coursePrefs = allPrefs.filter(p => p.coursePreference).map(p => p.coursePreference);
               
-              const hasAnyPrefs = cartCount + walkCount + scrambleCount + strokeCount > 0 || coursePrefs.length > 0;
+              const hasAnyPrefs = cartCount + walkCount + scrambleCount + strokeCount + morningCount + middayCount + twilightCount > 0 || coursePrefs.length > 0;
               
               if (!hasAnyPrefs) return null;
               
@@ -806,7 +809,9 @@ export default function EventPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span>🛺</span>
                         <span style={{ color: "var(--color-text-secondary)" }}>
-                          {cartCount} cart {walkCount > 0 && `· ${walkCount} walk`}
+                          {cartCount > 0 && `${cartCount} cart`}
+                          {cartCount > 0 && walkCount > 0 && ' · '}
+                          {walkCount > 0 && `${walkCount} walk`}
                         </span>
                       </div>
                     )}
@@ -817,6 +822,18 @@ export default function EventPage() {
                           {scrambleCount > 0 && `${scrambleCount} scramble`}
                           {scrambleCount > 0 && strokeCount > 0 && ' · '}
                           {strokeCount > 0 && `${strokeCount} stroke`}
+                        </span>
+                      </div>
+                    )}
+                    {(morningCount > 0 || middayCount > 0 || twilightCount > 0) && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>🕐</span>
+                        <span style={{ color: "var(--color-text-secondary)" }}>
+                          {morningCount > 0 && `${morningCount} morning`}
+                          {morningCount > 0 && (middayCount > 0 || twilightCount > 0) && ' · '}
+                          {middayCount > 0 && `${middayCount} midday`}
+                          {middayCount > 0 && twilightCount > 0 && ' · '}
+                          {twilightCount > 0 && `${twilightCount} twilight`}
                         </span>
                       </div>
                     )}
@@ -835,7 +852,7 @@ export default function EventPage() {
             {confirmedIds.map((uid) => {
               const isYou = uid === user?.uid;
               const prefs = getResponsePreferences(responses[uid]);
-              const hasPrefs = prefs.transport || prefs.format || prefs.coursePreference;
+              const hasPrefs = prefs.transport || prefs.format || prefs.teeTime || prefs.coursePreference;
               
               return (
                 <div key={uid} className="player-item" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
@@ -883,6 +900,16 @@ export default function EventPage() {
                           color: "var(--color-text-secondary)",
                         }}>
                           {prefs.format === 'scramble' ? '👥 Scramble' : '🏌️ Stroke'}
+                        </span>
+                      )}
+                      {prefs.teeTime && (
+                        <span style={{
+                          padding: "2px 8px",
+                          background: "var(--color-bg-secondary)",
+                          borderRadius: 12,
+                          color: "var(--color-text-secondary)",
+                        }}>
+                          {prefs.teeTime === 'morning' ? '🌅 Morning' : prefs.teeTime === 'midday' ? '☀️ Midday' : '🌇 Twilight'}
                         </span>
                       )}
                       {prefs.coursePreference && (
