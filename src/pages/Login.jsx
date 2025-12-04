@@ -51,14 +51,16 @@ export default function Login() {
     }}>
       <div className="card" style={{ width: "100%", maxWidth: 400 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
+          <h1 style={{ 
+            fontSize: 32, 
+            fontWeight: 700,
             background: "linear-gradient(135deg, #0f7b6c 0%, #2383e2 100%)",
-            margin: "0 auto 16px",
-          }} />
-          <h1 style={{ marginBottom: 4 }}>Welcome back</h1>
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            marginBottom: 8 
+          }}>GolfGang</h1>
+          <h2 style={{ marginBottom: 4, fontSize: 20, fontWeight: 500 }}>Welcome back</h2>
           <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14 }}>
             Sign in to your GolfGang account
           </p>

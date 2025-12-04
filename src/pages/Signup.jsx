@@ -19,12 +19,26 @@ export default function Signup() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showNotificationInfo, setShowNotificationInfo] = useState(false);
 
   async function usernameExists(name) {
     const uname = name.toLowerCase();
     const q = query(collection(db, "users"), where("username", "==", uname));
     const snap = await getDocs(q);
     return !snap.empty;
+  }
+
+  async function requestNotificationPermission() {
+    if ("Notification" in window) {
+      try {
+        const permission = await Notification.requestPermission();
+        return permission === "granted";
+      } catch (err) {
+        console.error("Notification permission error:", err);
+        return false;
+      }
+    }
+    return false;
   }
 
   async function handleSignup(e) {
@@ -55,8 +69,12 @@ export default function Signup() {
         isAdmin: false,
       });
 
+      // Request notification permission after successful signup
+      await requestNotificationPermission();
+
       navigate("/");
     } catch (err) {
+      console.error(err);
       setError(err.message || "Signup failed");
     }
 
@@ -73,14 +91,16 @@ export default function Signup() {
     }}>
       <div className="card" style={{ width: "100%", maxWidth: 400 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
+          <h1 style={{ 
+            fontSize: 32, 
+            fontWeight: 700,
             background: "linear-gradient(135deg, #0f7b6c 0%, #2383e2 100%)",
-            margin: "0 auto 16px",
-          }} />
-          <h1 style={{ marginBottom: 4 }}>Create account</h1>
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            marginBottom: 8 
+          }}>GolfGang</h1>
+          <h2 style={{ marginBottom: 4, fontSize: 20, fontWeight: 500 }}>Create account</h2>
           <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14 }}>
             Join GolfGang to plan rounds with friends
           </p>
@@ -129,6 +149,56 @@ export default function Signup() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+          </div>
+
+          {/* Notification info section */}
+          <div style={{ 
+            marginBottom: 20, 
+            padding: 12, 
+            background: "var(--color-surface-secondary, #f5f5f5)", 
+            borderRadius: 8,
+            fontSize: 13
+          }}>
+            <div style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "space-between",
+              marginBottom: showNotificationInfo ? 8 : 0
+            }}>
+              <span style={{ color: "var(--color-text-secondary)" }}>
+                🔔 We'll ask for notification permissions to keep you updated
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowNotificationInfo(!showNotificationInfo)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--color-primary, #0f7b6c)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  padding: 0,
+                  marginLeft: 8,
+                  textDecoration: "underline"
+                }}
+              >
+                {showNotificationInfo ? "Hide" : "Learn more"}
+              </button>
+            </div>
+            {showNotificationInfo && (
+              <div style={{ 
+                color: "var(--color-text-secondary)", 
+                fontSize: 12,
+                lineHeight: 1.5
+              }}>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  Notifications help you stay in the loop when friends invite you to rounds or comment on your posts.
+                </p>
+                <p style={{ margin: 0 }}>
+                  <strong>To disable notifications later:</strong> Go to your Profile and toggle off notifications, or simply log out of your account.
+                </p>
+              </div>
+            )}
           </div>
 
           <button
