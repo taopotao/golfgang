@@ -335,9 +335,9 @@ export default function EventPage() {
     <div className="page" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       
       {/* HEADER CARD */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="card" style={{ padding: 0 }}>
         {/* Hero Image */}
-        <div style={{ position: "relative", height: 180, background: "var(--color-bg-tertiary)" }}>
+        <div style={{ position: "relative", height: 180, background: "var(--color-bg-tertiary)", overflow: "hidden", borderRadius: "12px 12px 0 0" }}>
           <PlacePhoto
             placeId={event.coursePlaceId}
             alt={event.courseName || "Course"}
