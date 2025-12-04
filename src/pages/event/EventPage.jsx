@@ -16,6 +16,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import CourseAutocomplete from "../../components/CourseAutocomplete";
 import PlacePhoto from "../../components/PlacePhoto";
 import GolfConditions from "../../components/GolfConditions";
+import { triggerConfetti, showToast, hapticFeedback } from "../../utils/uiEffects";
 
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
@@ -155,14 +156,23 @@ export default function EventPage() {
   async function updateResponse(newStatus) {
     if (!user || !event) return;
     setSavingResponse(true);
+    hapticFeedback('light');
+    
     try {
       const ref = doc(db, "events", event.id);
       const newResponses = { ...responses, [user.uid]: newStatus };
       await updateDoc(ref, { responses: newResponses });
       setResponses(newResponses);
       setMyStatus(newStatus);
+      
+      if (newStatus === 'available') {
+        showToast("You're in! ⛳", 'success');
+      } else if (newStatus === 'unavailable') {
+        showToast("Response saved", 'default');
+      }
     } catch (err) {
       console.error("Error updating response", err);
+      showToast("Failed to save response", 'error');
     } finally {
       setSavingResponse(false);
     }
@@ -170,44 +180,57 @@ export default function EventPage() {
 
   const removePlayer = async (uid) => {
     if (!event || !uid) return;
+    hapticFeedback('medium');
+    
     const ref = doc(db, "events", event.id);
     const updated = { ...responses };
     delete updated[uid];
     await updateDoc(ref, { responses: updated });
     setResponses(updated);
     if (uid === user?.uid) setMyStatus(null);
+    showToast("Player removed", 'default');
   };
 
   const markBooked = async () => {
     if (!event) return;
+    hapticFeedback('success');
+    
     const ref = doc(db, "events", id);
     await updateDoc(ref, { booked: true, bookedAt: new Date().toISOString() });
     setEvent((prev) => prev ? { ...prev, booked: true, bookedAt: new Date().toISOString() } : prev);
+    
+    // Celebration! 🎉
+    triggerConfetti();
+    showToast("Round confirmed! ⛳🎉", 'success');
   };
 
   const unmarkBooked = async () => {
     if (!event) return;
+    hapticFeedback('medium');
+    
     const ref = doc(db, "events", id);
     await updateDoc(ref, { booked: false, bookedAt: null });
     setEvent((prev) => prev ? { ...prev, booked: false, bookedAt: null } : prev);
+    showToast("Booking removed", 'default');
   };
 
   const sendRsvpReminder = async () => {
-  if (!event) return;
-  setSendingReminder(true);
-  try {
-    // Explicitly specify the region (us-central1 is the default)
-    const functions = getFunctions(app, 'us-central1');
-    const triggerReminder = httpsCallable(functions, 'triggerRsvpReminder');
-    const result = await triggerReminder({ eventId: event.id });
-    alert(result.data.message || "Reminders sent!");
-  } catch (error) {
-    console.error("Error sending reminder:", error);
-    alert("Failed to send reminder: " + (error.message || "Unknown error"));
-  } finally {
-    setSendingReminder(false);
-  }
-};
+    if (!event) return;
+    setSendingReminder(true);
+    hapticFeedback('light');
+    
+    try {
+      const functions = getFunctions(app, 'us-central1');
+      const triggerReminder = httpsCallable(functions, 'triggerRsvpReminder');
+      const result = await triggerReminder({ eventId: event.id });
+      showToast(result.data.message || "Reminders sent! 📬", 'success');
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      showToast("Failed to send reminder", 'error');
+    } finally {
+      setSendingReminder(false);
+    }
+  };
 
   async function saveEdits() {
     if (!event) return;
@@ -228,24 +251,31 @@ export default function EventPage() {
       await updateDoc(ref, updatedFields);
       setEvent((prev) => prev ? { ...prev, ...updatedFields } : prev);
       setEditing(false);
+      showToast("Changes saved ✓", 'success');
     } catch (err) {
       console.error("Error saving edits", err);
-      alert("Could not save changes.");
+      showToast("Could not save changes", 'error');
     }
   }
 
   async function deleteEvent() {
     if (!event || !window.confirm("Delete this event?")) return;
+    hapticFeedback('heavy');
+    
     try {
       await deleteDoc(doc(db, "events", event.id));
+      showToast("Event deleted", 'default');
       navigate("/");
     } catch (err) {
       console.error("Error deleting event", err);
+      showToast("Failed to delete", 'error');
     }
   }
 
   async function shareToClipboard() {
     if (!event) return;
+    hapticFeedback('light');
+    
     const date = event.date?.toDate ? event.date.toDate() : null;
     const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
     const eventUrl = window.location.href;
@@ -258,9 +288,9 @@ export default function EventPage() {
 
     try {
       await navigator.clipboard.writeText(msg);
-      alert("Copied to clipboard!");
+      showToast("Copied to clipboard! 📋", 'success');
     } catch {
-      alert("Could not copy.");
+      showToast("Could not copy", 'error');
     }
   }
 
@@ -268,7 +298,8 @@ export default function EventPage() {
     return (
       <div className="page">
         <div className="card" style={{ maxWidth: 400, margin: "3rem auto", textAlign: "center" }}>
-          Loading…
+          <div className="skeleton" style={{ height: 24, width: '60%', margin: '0 auto 12px' }}></div>
+          <div className="skeleton" style={{ height: 16, width: '40%', margin: '0 auto' }}></div>
         </div>
       </div>
     );
@@ -350,12 +381,12 @@ export default function EventPage() {
               <div style={{ position: "relative" }}>
                 {editing ? (
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-primary btn-sm" onClick={saveEdits}>Save</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>Cancel</button>
+                    <button className="btn btn-primary btn-sm hover-lift press-effect" onClick={saveEdits}>Save</button>
+                    <button className="btn btn-ghost btn-sm press-effect" onClick={() => setEditing(false)}>Cancel</button>
                   </div>
                 ) : (
                   <button 
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-ghost btn-sm press-effect"
                     onClick={() => setShowMenu(!showMenu)}
                   >
                     •••
@@ -520,7 +551,7 @@ export default function EventPage() {
               </div>
               {isUserConfirmed && (
                 <button 
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-primary btn-sm hover-lift press-effect"
                   style={{ marginLeft: "auto" }}
                   onClick={() => window.open(buildGoogleCalendarUrl(event, window.location.href), "_blank")}
                 >
@@ -575,6 +606,7 @@ export default function EventPage() {
           display: "flex",
           alignItems: "center",
           gap: 10,
+          animation: "fade-up 0.3s ease-out",
         }}>
           <span style={{ fontSize: 18 }}>
             {myStatus === "available" ? (isUserReserve ? "🔔" : "✓") : "✗"}
@@ -607,7 +639,7 @@ export default function EventPage() {
             <div>No one has responded yet</div>
           </div>
         ) : (
-          <div className="player-list">
+          <div className="player-list stagger-list">
             {confirmedIds.map((uid) => {
               const isYou = uid === user?.uid;
               return (
@@ -622,7 +654,7 @@ export default function EventPage() {
                     </span>
                   </div>
                   {isAdmin && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => removePlayer(uid)}>
+                    <button className="btn btn-ghost btn-sm press-effect" onClick={() => removePlayer(uid)}>
                       Remove
                     </button>
                   )}
@@ -640,7 +672,7 @@ export default function EventPage() {
               <span className="section-title">Reserve List</span>
               <span className="section-count">{reserveIds.length}</span>
             </div>
-            <div className="player-list">
+            <div className="player-list stagger-list">
               {reserveIds.map((uid, idx) => {
                 const isYou = uid === user?.uid;
                 return (
@@ -666,7 +698,7 @@ export default function EventPage() {
                       </span>
                     </div>
                     {isAdmin && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => removePlayer(uid)}>
+                      <button className="btn btn-ghost btn-sm press-effect" onClick={() => removePlayer(uid)}>
                         Remove
                       </button>
                     )}

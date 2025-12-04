@@ -55,7 +55,8 @@ export default function Navbar() {
               textDecoration: 'none',
               fontSize: '1.5rem',
               fontWeight: 700,
-              color: 'var(--color-primary, #2d6a4f)',
+              color: 'var(--color-primary)',
+              fontFamily: 'var(--font-display)',
             }}
           >
             GolfGang
@@ -83,18 +84,18 @@ export default function Navbar() {
                   )}
                 </nav>
 
-                <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm">
+                <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm press-effect">
                   Profile
                 </button>
 
-                <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+                <button className="btn btn-ghost btn-sm press-effect" onClick={handleLogout}>
                   Logout
                 </button>
               </>
             )}
 
             {!user && (
-              <Link to="/login" className="btn btn-primary btn-sm">
+              <Link to="/login" className="btn btn-primary btn-sm hover-lift">
                 Login
               </Link>
             )}
@@ -121,7 +122,7 @@ export default function Navbar() {
                 display: 'block',
                 width: 22,
                 height: 2,
-                background: 'var(--color-text-main, #333)',
+                background: 'var(--color-text-main)',
                 borderRadius: 2,
                 transition: 'all 0.2s ease',
                 transform: mobileMenuOpen ? 'rotate(45deg) translateY(7px)' : 'none',
@@ -130,7 +131,7 @@ export default function Navbar() {
                 display: 'block',
                 width: 22,
                 height: 2,
-                background: 'var(--color-text-main, #333)',
+                background: 'var(--color-text-main)',
                 borderRadius: 2,
                 transition: 'all 0.2s ease',
                 opacity: mobileMenuOpen ? 0 : 1,
@@ -139,7 +140,7 @@ export default function Navbar() {
                 display: 'block',
                 width: 22,
                 height: 2,
-                background: 'var(--color-text-main, #333)',
+                background: 'var(--color-text-main)',
                 borderRadius: 2,
                 transition: 'all 0.2s ease',
                 transform: mobileMenuOpen ? 'rotate(-45deg) translateY(-7px)' : 'none',
@@ -155,16 +156,17 @@ export default function Navbar() {
           className="mobile-menu-overlay"
           style={{
             position: 'fixed',
-            top: 'var(--nav-height, 60px)',
+            top: 'var(--nav-height)',
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'var(--color-bg, #fff)',
+            background: 'var(--color-bg)',
             zIndex: 100,
             padding: 20,
             flexDirection: 'column',
             gap: 8,
             overflowY: 'auto',
+            animation: 'fade-up 0.2s ease-out',
           }}
         >
           {user && (
@@ -172,13 +174,13 @@ export default function Navbar() {
               {/* User info */}
               <div style={{
                 padding: '16px 0',
-                borderBottom: '1px solid var(--color-border-subtle, #eee)',
+                borderBottom: '1px solid var(--color-border-subtle)',
                 marginBottom: 8,
               }}>
                 <div style={{ fontWeight: 600, fontSize: 16 }}>
                   {user.email?.split('@')[0]}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted, #666)' }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                   {user.email}
                   {isAdmin && ' • Admin'}
                 </div>
@@ -194,9 +196,10 @@ export default function Navbar() {
                   gap: 12,
                   padding: '14px 0',
                   textDecoration: 'none',
-                  color: location.pathname === '/' ? 'var(--color-primary, #2d6a4f)' : 'var(--color-text-main, #333)',
+                  color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text-main)',
                   fontSize: 16,
                   fontWeight: 500,
+                  transition: 'transform 0.2s ease',
                 }}
               >
                 📅 Calendar
@@ -211,7 +214,7 @@ export default function Navbar() {
                   gap: 12,
                   padding: '14px 0',
                   textDecoration: 'none',
-                  color: location.pathname === '/profile' ? 'var(--color-primary, #2d6a4f)' : 'var(--color-text-main, #333)',
+                  color: location.pathname === '/profile' ? 'var(--color-primary)' : 'var(--color-text-main)',
                   fontSize: 16,
                   fontWeight: 500,
                 }}
@@ -229,7 +232,7 @@ export default function Navbar() {
                     gap: 12,
                     padding: '14px 0',
                     textDecoration: 'none',
-                    color: location.pathname.startsWith('/admin') ? 'var(--color-primary, #2d6a4f)' : 'var(--color-text-main, #333)',
+                    color: location.pathname.startsWith('/admin') ? 'var(--color-primary)' : 'var(--color-text-main)',
                     fontSize: 16,
                     fontWeight: 500,
                   }}
@@ -250,10 +253,13 @@ export default function Navbar() {
                   border: 'none',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  color: 'var(--color-danger, #dc3545)',
+                  color: 'var(--color-danger)',
                   fontSize: 16,
                   fontWeight: 500,
                   width: '100%',
+                  marginTop: 8,
+                  borderTop: '1px solid var(--color-border-subtle)',
+                  paddingTop: 22,
                 }}
               >
                 🚪 Logout
