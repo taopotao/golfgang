@@ -1427,3 +1427,17 @@ label {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Fix for admin dropdown menu being hidden/clipped */
+.event-page .card:first-child, 
+.page > .card:first-child {
+    overflow: visible !important;
+    z-index: 10;
+}
+
+/* Round the image corners since the card no longer clips them */
+.event-page .card:first-child img,
+.page > .card:first-child img {
+    border-top-left-radius: 16px; /* Adjust to match your design tokens if needed */
+    border-top-right-radius: 16px;
+}
