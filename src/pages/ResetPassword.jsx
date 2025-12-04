@@ -1,75 +1,111 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth, db } from "../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { auth } from "../firebase";
 
 export default function ResetPassword() {
-  const [identifier, setIdentifier] = useState(""); // email or username
-  const [message, setMessage] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  async function getEmail(identifier) {
-    if (identifier.includes("@")) return identifier;
-
-    const q = query(
-      collection(db, "users"),
-      where("username", "==", identifier.toLowerCase())
-    );
-    const snap = await getDocs(q);
-
-    if (snap.empty) throw new Error("Username not found");
-    return snap.docs[0].data().email;
-  }
 
   async function handleReset(e) {
     e.preventDefault();
     setError("");
-    setMessage("");
+    setSuccess(false);
     setLoading(true);
 
     try {
-      const email = await getEmail(identifier);
-      await sendPasswordResetEmail(auth, email);
-
-      setMessage("Password reset link sent! Check your email.");
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccess(true);
     } catch (err) {
-      setError(err.message);
+      console.error(err);
+      // Provide user-friendly error messages
+      if (err.code === "auth/user-not-found") {
+        setError("No account found with this email address.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else if (err.code === "auth/too-many-requests") {
+        setError("Too many attempts. Please try again later.");
+      } else {
+        setError(err.message || "Failed to send reset email.");
+      }
     }
 
     setLoading(false);
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "4rem auto", padding: "1rem" }}>
-      <div className="surface" style={{ padding: "2rem" }}>
-        <h1 style={{ marginTop: 0 }}>Reset password</h1>
+    <div style={{
+      minHeight: "calc(100vh - var(--nav-height))",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    }}>
+      <div className="card" style={{ width: "100%", maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <h1 style={{ 
+            fontSize: 32, 
+            fontWeight: 700,
+            color: "#0f7b6c",
+            marginBottom: 8 
+          }}>GolfGang</h1>
+          <h2 style={{ marginBottom: 4, fontSize: 20, fontWeight: 500 }}>Reset password</h2>
+          <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14 }}>
+            Enter your email and we'll send you a reset link
+          </p>
+        </div>
 
-        <p style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
-          Enter your email or username, and we’ll send you a reset link.
-        </p>
+        {error && (
+          <div className="toast toast-danger" style={{ marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleReset}>
-          <input
-            className="input"
-            placeholder="Email or username"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            style={{ marginBottom: "1rem" }}
-          />
+        {success ? (
+          <div>
+            <div className="toast toast-success" style={{ marginBottom: 16 }}>
+              Password reset email sent! Check your inbox (and spam folder) for a link to reset your password.
+            </div>
+            <Link 
+              to="/login" 
+              className="btn btn-primary"
+              style={{ width: "100%", padding: "12px 16px", display: "block", textAlign: "center" }}
+            >
+              Back to sign in
+            </Link>
+          </div>
+        ) : (
+          <form onSubmit={handleReset}>
+            <div style={{ marginBottom: 20 }}>
+              <label>Email</label>
+              <input
+                className="input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+            </div>
 
-          {message && (
-            <p style={{ color: "var(--success)" }}>{message}</p>
-          )}
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", padding: "12px 16px" }}
+              disabled={loading}
+              type="submit"
+            >
+              {loading ? "Sending…" : "Send reset link"}
+            </button>
+          </form>
+        )}
 
-          {error && (
-            <p style={{ color: "var(--danger)" }}>{error}</p>
-          )}
-
-          <button className="btn btn-primary" style={{ width: "100%" }}>
-            {loading ? "Sending..." : "Send reset link"}
-          </button>
-        </form>
+        <div style={{ marginTop: 20, textAlign: "center", fontSize: 14 }}>
+          <Link to="/login" style={{ color: "var(--color-text-secondary)" }}>
+            ← Back to sign in
+          </Link>
+        </div>
       </div>
     </div>
   );
