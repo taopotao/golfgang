@@ -337,7 +337,13 @@ export default function EventPage() {
       {/* HEADER CARD */}
       <div className="card" style={{ padding: 0 }}>
         {/* Hero Image */}
-        <div style={{ position: "relative", height: 180, background: "var(--color-bg-tertiary)", overflow: "hidden", borderRadius: "12px 12px 0 0" }}>
+        <div style={{ 
+            position: "relative", 
+            height: 180, 
+            background: "var(--color-bg-tertiary)", 
+            overflow: "hidden", 
+            borderRadius: "var(--radius-lg) var(--radius-lg) 0 0"  // ✅ Matches card radius
+          }}>
           <PlacePhoto
             placeId={event.coursePlaceId}
             alt={event.courseName || "Course"}
