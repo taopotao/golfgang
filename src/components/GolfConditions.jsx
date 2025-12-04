@@ -61,37 +61,11 @@ export default function GolfConditions({ placeId, date, tee }) {
 
         const weather = await getWeather(coords.lat, coords.lng);
 
-        // determine tee-time index (correctly accounting for date)
+        // determine tee-time index (hour of day)
         let idx = null;
         if (tee) {
           const [h] = tee.split(":").map(Number);
-          
-          // 1. Calculate days difference between today and event date
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          // 'date' prop is a Firestore timestamp, convert to JS Date
-          const eventDate = date?.toDate ? date.toDate() : new Date();
-          eventDate.setHours(0, 0, 0, 0);
-          
-          const diffTime = eventDate.getTime() - today.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
-          // 2. Calculate correct index: (Days * 24) + Hour
-          // Open-Meteo returns 168 hours (7 days) starting from today 00:00
-          const calculatedIndex = (diffDays * 24) + h;
-          
-          // 3. Safety check: ensure index is within the data range (0 to ~167)
-          // If the date is in the past or too far in future, fallback to just the time today (h) or 9am
-          const maxIndex = weather.hourly.temperature_2m.length - 1;
-          
-          if (calculatedIndex >= 0 && calculatedIndex <= maxIndex) {
-            idx = calculatedIndex;
-          } else {
-            // Event is too far in future or past for this forecast
-            // Fallback to today's weather at that time, or just show general data
-            idx = h; 
-          }
+          idx = h; // hour index
         }
 
         setData({ coords, weather, idx });
