@@ -16,6 +16,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import CourseAutocomplete from "../../components/CourseAutocomplete";
 import PlacePhoto from "../../components/PlacePhoto";
 import GolfConditions from "../../components/GolfConditions";
+import RSVPPreferencesModal from "../../components/RSVPPreferencesModal";
 import { triggerConfetti, showToast, hapticFeedback } from "../../utils/uiEffects";
 
 // Build Google Calendar URL
@@ -83,6 +84,7 @@ export default function EventPage() {
   const [editing, setEditing] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [form, setForm] = useState({
     title: "",
     notes: "",
@@ -114,7 +116,8 @@ export default function EventPage() {
         setResponses(r);
 
         if (user) {
-          setMyStatus(r[user.uid] || null);
+          const userResponse = r[user.uid];
+          setMyStatus(userResponse ? (typeof userResponse === 'string' ? userResponse : userResponse.status) : null);
         }
 
         setForm({
@@ -153,14 +156,21 @@ export default function EventPage() {
     loadUsers();
   }, [id, navigate, user]);
 
-  async function updateResponse(newStatus) {
+  async function updateResponse(newStatus, preferences = {}) {
     if (!user || !event) return;
     setSavingResponse(true);
     hapticFeedback('light');
     
     try {
       const ref = doc(db, "events", event.id);
-      const newResponses = { ...responses, [user.uid]: newStatus };
+      const newResponses = { 
+        ...responses, 
+        [user.uid]: newStatus === null ? null : {
+          status: newStatus,
+          preferences: preferences,
+          updatedAt: new Date().toISOString(),
+        }
+      };
       await updateDoc(ref, { responses: newResponses });
       setResponses(newResponses);
       setMyStatus(newStatus);
@@ -175,6 +185,7 @@ export default function EventPage() {
       showToast("Failed to save response", 'error');
     } finally {
       setSavingResponse(false);
+      setShowRSVPModal(false);
     }
   }
 
@@ -315,8 +326,21 @@ export default function EventPage() {
     );
   }
 
+  // Helper to get status from response (handles both old string format and new object format)
+  const getResponseStatus = (response) => {
+    if (!response) return null;
+    if (typeof response === 'string') return response; // Legacy format
+    return response.status; // New format with preferences
+  };
+  
+  // Helper to get preferences from response
+  const getResponsePreferences = (response) => {
+    if (!response || typeof response === 'string') return {};
+    return response.preferences || {};
+  };
+
   const allAttendingIds = Object.entries(responses)
-    .filter(([_, status]) => status === "available")
+    .filter(([_, response]) => getResponseStatus(response) === "available")
     .map(([uid]) => uid);
   
   const confirmedIds = allAttendingIds.slice(0, MAX_PLAYERS);
@@ -657,7 +681,15 @@ export default function EventPage() {
               <div className="rsvp-buttons">
                 <button
                   className={`rsvp-btn rsvp-btn--available ${myStatus === "available" ? "active" : ""}`}
-                  onClick={() => updateResponse(myStatus === "available" ? null : "available")}
+                  onClick={() => {
+                    if (myStatus === "available") {
+                      // Already in - clicking again removes response
+                      updateResponse(null);
+                    } else {
+                      // Not in yet - show preferences modal
+                      setShowRSVPModal(true);
+                    }
+                  }}
                   disabled={savingResponse}
                 >
                   {savingResponse && myStatus === "available" ? "..." : "✓ I'm in"}
@@ -703,8 +735,26 @@ export default function EventPage() {
               </div>
             )}
           </div>
+          {/* Edit preferences button - only show if attending and event not booked */}
+          {myStatus === "available" && !event.booked && (
+            <button 
+              className="btn btn-ghost btn-sm press-effect"
+              onClick={() => setShowRSVPModal(true)}
+              style={{ fontSize: 12 }}
+            >
+              Edit preferences
+            </button>
+          )}
         </div>
       )}
+
+      {/* RSVP Preferences Modal */}
+      <RSVPPreferencesModal
+        isOpen={showRSVPModal}
+        onClose={() => setShowRSVPModal(false)}
+        onSubmit={(preferences) => updateResponse("available", preferences)}
+        existingPreferences={user ? getResponsePreferences(responses[user.uid]) : {}}
+      />
 
       {/* PLAYERS CARD */}
       <div className="card">
@@ -719,29 +769,145 @@ export default function EventPage() {
             <div>No one has responded yet</div>
           </div>
         ) : (
-          <div className="player-list stagger-list">
+          <>
+            {/* Preferences Summary - show if at least 2 people have preferences */}
+            {(() => {
+              const allPrefs = confirmedIds.map(uid => getResponsePreferences(responses[uid]));
+              const cartCount = allPrefs.filter(p => p.transport === 'cart').length;
+              const walkCount = allPrefs.filter(p => p.transport === 'walk').length;
+              const scrambleCount = allPrefs.filter(p => p.format === 'scramble').length;
+              const strokeCount = allPrefs.filter(p => p.format === 'stroke').length;
+              const coursePrefs = allPrefs.filter(p => p.coursePreference).map(p => p.coursePreference);
+              
+              const hasAnyPrefs = cartCount + walkCount + scrambleCount + strokeCount > 0 || coursePrefs.length > 0;
+              
+              if (!hasAnyPrefs) return null;
+              
+              return (
+                <div style={{
+                  padding: "12px 14px",
+                  background: "var(--color-bg-secondary)",
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  fontSize: 13,
+                }}>
+                  <div style={{ 
+                    fontSize: 11, 
+                    fontWeight: 500, 
+                    color: "var(--color-text-tertiary)", 
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    marginBottom: 8,
+                  }}>
+                    Group Preferences
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                    {(cartCount > 0 || walkCount > 0) && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>🛺</span>
+                        <span style={{ color: "var(--color-text-secondary)" }}>
+                          {cartCount} cart {walkCount > 0 && `· ${walkCount} walk`}
+                        </span>
+                      </div>
+                    )}
+                    {(scrambleCount > 0 || strokeCount > 0) && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>🏌️</span>
+                        <span style={{ color: "var(--color-text-secondary)" }}>
+                          {scrambleCount > 0 && `${scrambleCount} scramble`}
+                          {scrambleCount > 0 && strokeCount > 0 && ' · '}
+                          {strokeCount > 0 && `${strokeCount} stroke`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {coursePrefs.length > 0 && (
+                    <div style={{ marginTop: 8, color: "var(--color-text-secondary)" }}>
+                      <span style={{ color: "var(--color-text-tertiary)" }}>Course suggestions: </span>
+                      {coursePrefs.join(", ")}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          
+            <div className="player-list stagger-list">
             {confirmedIds.map((uid) => {
               const isYou = uid === user?.uid;
+              const prefs = getResponsePreferences(responses[uid]);
+              const hasPrefs = prefs.transport || prefs.format || prefs.coursePreference;
+              
               return (
-                <div key={uid} className="player-item">
-                  <div className="player-info">
-                    <div className={`player-avatar ${isYou ? "player-avatar--you" : ""}`}>
-                      {getUserName(uid).charAt(0).toUpperCase()}
+                <div key={uid} className="player-item" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div className="player-info">
+                      <div className={`player-avatar ${isYou ? "player-avatar--you" : ""}`}>
+                        {getUserName(uid).charAt(0).toUpperCase()}
+                      </div>
+                      <span className="player-name">
+                        {getUserName(uid)}
+                        {isYou && <span className="player-badge">You</span>}
+                      </span>
                     </div>
-                    <span className="player-name">
-                      {getUserName(uid)}
-                      {isYou && <span className="player-badge">You</span>}
-                    </span>
+                    {isAdmin && (
+                      <button className="btn btn-ghost btn-sm press-effect" onClick={() => removePlayer(uid)}>
+                        Remove
+                      </button>
+                    )}
                   </div>
-                  {isAdmin && (
-                    <button className="btn btn-ghost btn-sm press-effect" onClick={() => removePlayer(uid)}>
-                      Remove
-                    </button>
+                  
+                  {/* Player preferences */}
+                  {hasPrefs && (
+                    <div style={{ 
+                      display: "flex", 
+                      flexWrap: "wrap",
+                      gap: 6, 
+                      marginLeft: 46,
+                      fontSize: 12,
+                    }}>
+                      {prefs.transport && (
+                        <span style={{
+                          padding: "2px 8px",
+                          background: "var(--color-bg-secondary)",
+                          borderRadius: 12,
+                          color: "var(--color-text-secondary)",
+                        }}>
+                          {prefs.transport === 'cart' ? '🛺 Cart' : '🚶 Walk'}
+                        </span>
+                      )}
+                      {prefs.format && (
+                        <span style={{
+                          padding: "2px 8px",
+                          background: "var(--color-bg-secondary)",
+                          borderRadius: 12,
+                          color: "var(--color-text-secondary)",
+                        }}>
+                          {prefs.format === 'scramble' ? '👥 Scramble' : '🏌️ Stroke'}
+                        </span>
+                      )}
+                      {prefs.coursePreference && (
+                        <span style={{
+                          padding: "2px 8px",
+                          background: "var(--color-primary-soft)",
+                          borderRadius: 12,
+                          color: "var(--color-primary)",
+                          maxWidth: 200,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={prefs.coursePreference}
+                        >
+                          📍 {prefs.coursePreference}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
+          </>
         )}
 
         {/* Reserve list */}
