@@ -330,39 +330,68 @@ export default function EventPage() {
   };
 
   const mapsUrl = buildGoogleMapsUrl(event.coursePlaceId, event.courseName);
+  
+  // Check if we have course info to show the photo/conditions
+  const hasCourseInfo = event.coursePlaceId || event.courseName;
 
   return (
     <div className="page" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       
-      {/* HEADER CARD */}
-      <div className="card" style={{ padding: 0 }}>
-        {/* Hero Image */}
-        <div style={{ 
+      {/* HEADER CARD - using "simple" class to disable hover effect */}
+      <div className="card simple" style={{ padding: 0, overflow: "hidden" }}>
+        {/* Hero Image - only show if we have a course */}
+        {hasCourseInfo ? (
+          <div style={{ 
             position: "relative", 
             height: 180, 
             background: "var(--color-bg-tertiary)", 
-            overflow: "hidden", 
-            borderRadius: "var(--radius-lg) var(--radius-lg) 0 0"  // ✅ Matches card radius
+            overflow: "hidden",
           }}>
-          <PlacePhoto
-            placeId={event.coursePlaceId}
-            alt={event.courseName || "Course"}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-          {/* Status badge overlay */}
-          <div style={{ 
-            position: "absolute", 
-            top: 12, 
-            right: 12,
-            display: "flex",
-            gap: 8,
-          }}>
-            <span className={`status-badge ${event.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
-              <span className="status-badge--dot" />
-              {event.booked ? "Booked" : "Proposed"}
-            </span>
+            <PlacePhoto
+              placeId={event.coursePlaceId}
+              alt={event.courseName || "Course"}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+            {/* Status badge overlay */}
+            <div style={{ 
+              position: "absolute", 
+              top: 12, 
+              right: 12,
+              display: "flex",
+              gap: 8,
+            }}>
+              <span className={`status-badge ${event.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
+                <span className="status-badge--dot" />
+                {event.booked ? "Booked" : "Proposed"}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Placeholder header when no course selected */
+          <div style={{ 
+            position: "relative", 
+            height: 120, 
+            background: "linear-gradient(135deg, var(--color-fairway) 0%, var(--color-fairway-light) 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <span style={{ fontSize: 48, opacity: 0.3 }}>⛳</span>
+            {/* Status badge overlay */}
+            <div style={{ 
+              position: "absolute", 
+              top: 12, 
+              right: 12,
+              display: "flex",
+              gap: 8,
+            }}>
+              <span className={`status-badge ${event.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
+                <span className="status-badge--dot" />
+                {event.booked ? "Booked" : "Proposed"}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div style={{ padding: 20 }}>
@@ -446,10 +475,11 @@ export default function EventPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
             {!editing ? (
               <>
-                {event.courseName && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-                    <span style={{ fontSize: 16 }}>📍</span>
-                    {mapsUrl ? (
+                {/* Course - show TBA if not set */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                  <span style={{ fontSize: 16 }}>📍</span>
+                  {event.courseName ? (
+                    mapsUrl ? (
                       <a 
                         href={mapsUrl} 
                         target="_blank" 
@@ -463,15 +493,27 @@ export default function EventPage() {
                       </a>
                     ) : (
                       <span>{event.courseName}</span>
-                    )}
-                  </div>
-                )}
-                {event.tee && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-                    <span style={{ fontSize: 16 }}>🕐</span>
+                    )
+                  ) : (
+                    <span style={{ color: "var(--color-text-tertiary)", fontStyle: "italic" }}>
+                      Course TBA
+                    </span>
+                  )}
+                </div>
+                
+                {/* Tee time - show TBA if not set */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                  <span style={{ fontSize: 16 }}>🕐</span>
+                  {event.tee ? (
                     <span>{event.tee}</span>
-                  </div>
-                )}
+                  ) : (
+                    <span style={{ color: "var(--color-text-tertiary)", fontStyle: "italic" }}>
+                      Tee time TBA
+                    </span>
+                  )}
+                </div>
+                
+                {/* Player count */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
                   <span style={{ fontSize: 16 }}>👥</span>
                   <span>{confirmedIds.length}/{MAX_PLAYERS}</span>
@@ -532,14 +574,46 @@ export default function EventPage() {
             </p>
           )}
 
-          {/* Golf Conditions */}
-          {!editing && event.coursePlaceId && (
+          {/* Golf Conditions - only show if we have course AND tee time */}
+          {!editing && event.coursePlaceId && event.tee && (
             <div style={{ marginTop: 16 }}>
               <GolfConditions
                 placeId={event.coursePlaceId}
                 tee={event.tee}
                 date={event.date}
               />
+            </div>
+          )}
+          
+          {/* Prompt to add details if missing */}
+          {!editing && (!event.coursePlaceId || !event.tee) && isAdmin && (
+            <div style={{ 
+              marginTop: 16, 
+              padding: "12px 16px",
+              background: "var(--color-warning-soft)",
+              borderRadius: 8,
+              fontSize: 13,
+              color: "var(--color-warning)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}>
+              <span>💡</span>
+              <span>
+                {!event.coursePlaceId && !event.tee 
+                  ? "Add a course and tee time to see weather conditions"
+                  : !event.coursePlaceId 
+                    ? "Add a course to see weather conditions"
+                    : "Add a tee time to see weather conditions"
+                }
+              </span>
+              <button 
+                className="btn btn-ghost btn-sm"
+                style={{ marginLeft: "auto", padding: "4px 10px" }}
+                onClick={() => setEditing(true)}
+              >
+                Edit
+              </button>
             </div>
           )}
         </div>
