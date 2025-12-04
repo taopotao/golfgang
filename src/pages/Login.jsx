@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -54,10 +54,7 @@ export default function Login() {
           <h1 style={{ 
             fontSize: 32, 
             fontWeight: 700,
-            background: "linear-gradient(135deg, #0f7b6c 0%, #2383e2 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
+            color: "#0f7b6c",
             marginBottom: 8 
           }}>GolfGang</h1>
           <h2 style={{ marginBottom: 4, fontSize: 20, fontWeight: 500 }}>Welcome back</h2>
@@ -108,12 +105,12 @@ export default function Login() {
         </form>
 
         <div style={{ marginTop: 20, textAlign: "center", fontSize: 14 }}>
-          <a href="/signup" style={{ display: "block", marginBottom: 8 }}>
+          <Link to="/signup" style={{ display: "block", marginBottom: 8 }}>
             Create an account
-          </a>
-          <a href="/reset-password" style={{ color: "var(--color-text-secondary)" }}>
+          </Link>
+          <Link to="/reset-password" style={{ color: "var(--color-text-secondary)" }}>
             Forgot password?
-          </a>
+          </Link>
         </div>
       </div>
     </div>
