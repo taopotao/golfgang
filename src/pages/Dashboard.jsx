@@ -6,6 +6,13 @@ import { Link } from "react-router-dom";
 import CourseAutocomplete from "../components/CourseAutocomplete";
 import { showToast, hapticFeedback } from "../utils/uiEffects";
 
+// Helper to get status from response (handles both old string format and new object format)
+const getResponseStatus = (response) => {
+  if (!response) return null;
+  if (typeof response === 'string') return response; // Legacy format: "available"
+  return response.status; // New format: { status: "available", preferences: {...} }
+};
+
 export default function Dashboard() {
   const { user, isAdmin } = useAuth();
 
@@ -204,8 +211,10 @@ export default function Dashboard() {
             <div className="stagger-list">
               {[...events].sort((a, b) => a.date.toMillis() - b.date.toMillis()).map((ev) => {
                 const dateObj = ev.date.toDate();
-                const myStatus = user && ev.responses ? ev.responses[user.uid] : null;
-                const attendingCount = ev.responses ? Object.values(ev.responses).filter(s => s === 'available').length : 0;
+                const myStatus = user && ev.responses ? getResponseStatus(ev.responses[user.uid]) : null;
+                const attendingCount = ev.responses 
+                  ? Object.values(ev.responses).filter(r => getResponseStatus(r) === 'available').length 
+                  : 0;
                 return (
                   <Link key={ev.id} to={`/event/${ev.id}`} className={`event-list-item ${myStatus === 'available' ? 'event-list-item--attending' : ''}`} style={{ textDecoration: "none" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -240,8 +249,10 @@ export default function Dashboard() {
             {selectedDayEvents.length > 0 ? (
               <div style={{ marginBottom: 20 }} className="stagger-list">
                 {selectedDayEvents.map((ev) => {
-                  const attendingCount = ev.responses ? Object.values(ev.responses).filter(s => s === 'available').length : 0;
-                  const myStatus = user && ev.responses ? ev.responses[user.uid] : null;
+                  const attendingCount = ev.responses 
+                    ? Object.values(ev.responses).filter(r => getResponseStatus(r) === 'available').length 
+                    : 0;
+                  const myStatus = user && ev.responses ? getResponseStatus(ev.responses[user.uid]) : null;
                   return (
                     <Link key={ev.id} to={`/event/${ev.id}`} onClick={() => setShowDayModal(false)} style={{ display: "block", padding: 14, background: "var(--color-bg-secondary)", borderRadius: 8, marginBottom: 8, textDecoration: "none", color: "inherit", borderLeft: myStatus === 'available' ? "3px solid var(--color-success)" : "3px solid transparent" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
