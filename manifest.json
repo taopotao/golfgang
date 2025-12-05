@@ -1,0 +1,8 @@
+{
+  "name": "GolfGang",
+  "short_name": "GolfGang",
+  "start_url": "/golfgang/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2d6a4f",
+}
