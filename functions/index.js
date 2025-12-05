@@ -36,6 +36,17 @@ const NOTIFICATION_MESSAGES = {
 };
 
 /**
+ * Helper function to get status from response (handles both old string and new object format)
+ * @param {string|Object} response - Response value (either string or object with status property)
+ * @return {string|null} Status string or null
+ */
+function getStatus(response) {
+    if (!response) return null;
+    if (typeof response === 'string') return response; // Legacy format
+    return response.status; // New format with preferences
+}
+
+/**
  * Get FCM tokens for a list of user IDs
  * @param {Array} userIds - Array of user IDs
  * @return {Promise<Array>} Array of FCM tokens
@@ -193,7 +204,7 @@ exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => 
         const responses = afterData.responses || {};
         const attendingUserIds = Object.entries(responses)
             .filter(function(entry) {
-                return entry[1] === "available";
+                return getStatus(entry[1]) === "available";
             })
             .map(function(entry) {
                 return entry[0];
@@ -223,8 +234,9 @@ exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => 
     const newAvailable = Object.entries(afterResponses)
         .filter(function(entry) {
             const uid = entry[0];
-            const status = entry[1];
-            return status === "available" && beforeResponses[uid] !== "available";
+            const afterStatus = getStatus(entry[1]);
+            const beforeStatus = getStatus(beforeResponses[uid]);
+            return afterStatus === "available" && beforeStatus !== "available";
         })
         .map(function(entry) {
             return entry[0];
