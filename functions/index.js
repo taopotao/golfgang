@@ -25,26 +25,15 @@ const NOTIFICATION_MESSAGES = {
         title: "🏌️ New Round Alert!",
         bodyTemplate: "{eventTitle} - Are you in? Tap to RSVP 👆",
     },
-    adminRsvpNotification: {
-        title: "📋 New RSVP",
-        bodyTemplate: "{playerName} just responded to {eventTitle}",
+    playerJoined: {
+        title: "👋 New Player!",
+        bodyTemplate: "{playerName} just joined {eventTitle}!",
     },
     rsvpReminder: {
         title: "⏰ RSVP Reminder",
         bodyTemplate: "Don't forget to respond to {eventTitle}!",
     },
 };
-
-/**
- * Helper function to get status from response (handles both old string and new object format)
- * @param {string|Object} response - Response value (either string or object with status property)
- * @return {string|null} Status string or null
- */
-function getStatus(response) {
-    if (!response) return null;
-    if (typeof response === 'string') return response; // Legacy format
-    return response.status; // New format with preferences
-}
 
 /**
  * Get FCM tokens for a list of user IDs
@@ -68,32 +57,6 @@ async function getTokensForUsers(userIds) {
         }
     }
 
-    return [...new Set(tokens)];
-}
-
-/**
- * Get FCM tokens for admin users
- * @return {Promise<Array>} Array of FCM tokens for admins
- */
-async function getAdminTokens() {
-    const tokens = [];
-    
-    try {
-        const adminsSnapshot = await db.collection("users")
-            .where("isAdmin", "==", true)
-            .where("notificationsEnabled", "==", true)
-            .get();
-        
-        adminsSnapshot.forEach(function(doc) {
-            const userData = doc.data();
-            if (userData.fcmTokens) {
-                tokens.push(...userData.fcmTokens);
-            }
-        });
-    } catch (error) {
-        console.error("Error getting admin tokens", error);
-    }
-    
     return [...new Set(tokens)];
 }
 
@@ -191,7 +154,7 @@ exports.onEventCreated = onDocumentCreated("events/{eventId}", async (event) => 
     );
 });
 
-// 2. Notify when event is booked OR when someone RSVPs as available (admin notification)
+// 2. Notify when event is booked OR when someone joins
 exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => {
     const beforeData = event.data.before.data();
     const afterData = event.data.after.data();
@@ -204,7 +167,7 @@ exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => 
         const responses = afterData.responses || {};
         const attendingUserIds = Object.entries(responses)
             .filter(function(entry) {
-                return getStatus(entry[1]) === "available";
+                return entry[1] === "available";
             })
             .map(function(entry) {
                 return entry[0];
@@ -227,16 +190,15 @@ exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => 
         return;
     }
 
-    // Check if someone new marked themselves as available
+    // Check if someone new joined
     const beforeResponses = beforeData.responses || {};
     const afterResponses = afterData.responses || {};
 
     const newAvailable = Object.entries(afterResponses)
         .filter(function(entry) {
             const uid = entry[0];
-            const afterStatus = getStatus(entry[1]);
-            const beforeStatus = getStatus(beforeResponses[uid]);
-            return afterStatus === "available" && beforeStatus !== "available";
+            const status = entry[1];
+            return status === "available" && beforeResponses[uid] !== "available";
         })
         .map(function(entry) {
             return entry[0];
@@ -244,40 +206,43 @@ exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => 
 
     if (newAvailable.length === 0) return;
 
-    // Notify admins about new available RSVPs
-    const adminTokens = await getAdminTokens();
-    
-    if (adminTokens.length === 0) {
-        console.log("No admin tokens found");
-        return;
-    }
-
-    for (const playerId of newAvailable) {
-        const playerDoc = await db.collection("users").doc(playerId).get();
+    for (const newPlayerId of newAvailable) {
+        const playerDoc = await db.collection("users").doc(newPlayerId).get();
         let playerName = "Someone";
         if (playerDoc.exists) {
-            const userData = playerDoc.data();
-            if (userData.username) {
-                playerName = userData.username;
-            } else if (userData.email) {
-                playerName = userData.email.split("@")[0];
+            const pData = playerDoc.data();
+            if (pData.username) {
+                playerName = pData.username;
+            } else if (pData.email) {
+                playerName = pData.email.split("@")[0];
             }
         }
 
-        console.log(playerName + " marked available for event " + eventId + " - notifying admins");
+        console.log(playerName + " joined event " + eventId);
 
-        const msg = NOTIFICATION_MESSAGES.adminRsvpNotification;
+        const otherAttendees = Object.entries(afterResponses)
+            .filter(function(entry) {
+                return entry[1] === "available" && entry[0] !== newPlayerId;
+            })
+            .map(function(entry) {
+                return entry[0];
+            });
+
+        if (otherAttendees.length === 0) continue;
+
+        const tokens = await getTokensForUsers(otherAttendees);
+        const msg = NOTIFICATION_MESSAGES.playerJoined;
         const eventTitle = afterData.title || "the round";
 
         await sendNotification(
-            adminTokens,
+            tokens,
             {
                 title: msg.title,
                 body: msg.bodyTemplate
                     .replace("{playerName}", playerName)
                     .replace("{eventTitle}", eventTitle),
             },
-            {eventId: eventId, type: "admin_rsvp_notification"},
+            {eventId: eventId, type: "player_joined"},
         );
     }
 });
