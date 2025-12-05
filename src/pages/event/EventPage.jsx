@@ -542,6 +542,19 @@ export default function EventPage() {
                   <span style={{ fontSize: 16 }}>👥</span>
                   <span>{confirmedIds.length}/{MAX_PLAYERS}</span>
                 </div>
+                {/* RSVP Deadline */}
+                {event.rsvpDeadline && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                    <span style={{ fontSize: 16 }}>📅</span>
+                    <span>
+                      RSVP by {event.rsvpDeadline.toDate().toLocaleDateString("en-AU", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short"
+                      })}
+                    </span>
+                  </div>
+                )}
               </>
             ) : (
               <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
