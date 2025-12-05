@@ -341,8 +341,13 @@ export default function EventPage() {
 
   const allAttendingIds = Object.entries(responses)
     .filter(([_, response]) => getResponseStatus(response) === "available")
+    .sort(([, a], [, b]) => {
+      const aTime = a?.rsvpAt?.toMillis?.() || 0;
+      const bTime = b?.rsvpAt?.toMillis?.() || 0;
+      return aTime - bTime; // earliest RSVP first
+    })
     .map(([uid]) => uid);
-  
+
   const confirmedIds = allAttendingIds.slice(0, MAX_PLAYERS);
   const reserveIds = allAttendingIds.slice(MAX_PLAYERS);
   const isUserReserve = user && reserveIds.includes(user.uid);
@@ -951,49 +956,141 @@ export default function EventPage() {
         )}
 
         {/* Reserve list */}
-        {reserveIds.length > 0 && (
-          <>
-            <div className="divider" />
-            <div className="section-header">
-              <span className="section-title">Reserve List</span>
-              <span className="section-count">{reserveIds.length}</span>
-            </div>
-            <div className="player-list stagger-list">
-              {reserveIds.map((uid, idx) => {
-                const isYou = uid === user?.uid;
-                return (
-                  <div key={uid} className="player-item" style={{ opacity: 0.7 }}>
-                    <div className="player-info">
-                      <div style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "50%",
-                        background: "var(--color-warning-soft)",
-                        color: "var(--color-warning)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}>
-                        {idx + 1}
+          {reserveIds.length > 0 && (
+            <>
+              <div className="divider" />
+              <div className="section-header">
+                <span className="section-title">Reserve List</span>
+                <span className="section-count">{reserveIds.length}</span>
+              </div>
+              <div className="player-list stagger-list">
+                {reserveIds.map((uid, idx) => {
+                  const isYou = uid === user?.uid;
+                  const prefs = getResponsePreferences(responses[uid]);
+                  const hasPrefs =
+                    prefs.transport || prefs.format || prefs.teeTime || prefs.coursePreference;
+
+                  return (
+                    <div
+                      key={uid}
+                      className="player-item"
+                      style={{ flexDirection: "column", alignItems: "stretch", gap: 8, opacity: 0.7 }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="player-info">
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "50%",
+                              background: "var(--color-warning-soft)",
+                              color: "var(--color-warning)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {idx + 1}
+                          </div>
+                          <span className="player-name">
+                            {getUserName(uid)}
+                            {isYou && (
+                              <span
+                                className="player-badge"
+                                style={{ background: "var(--color-warning)" }}
+                              >
+                                You
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        {isAdmin && (
+                          <button
+                            className="btn btn-ghost btn-sm press-effect"
+                            onClick={() => removePlayer(uid)}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
-                      <span className="player-name">
-                        {getUserName(uid)}
-                        {isYou && <span className="player-badge" style={{ background: "var(--color-warning)" }}>You</span>}
-                      </span>
+
+                      {hasPrefs && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 6,
+                            marginLeft: 46,
+                            fontSize: 12,
+                          }}
+                        >
+                          {prefs.transport && (
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                background: "var(--color-bg-secondary)",
+                                borderRadius: 12,
+                                color: "var(--color-text-secondary)",
+                              }}
+                            >
+                              {prefs.transport === "cart" ? "🛺 Cart" : "🚶 Walk"}
+                            </span>
+                          )}
+                          {prefs.format && (
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                background: "var(--color-bg-secondary)",
+                                borderRadius: 12,
+                                color: "var(--color-text-secondary)",
+                              }}
+                            >
+                              {prefs.format === "scramble" ? "👥 Scramble" : "🏌️ Stroke"}
+                            </span>
+                          )}
+                          {prefs.teeTime && (
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                background: "var(--color-bg-secondary)",
+                                borderRadius: 12,
+                                color: "var(--color-text-secondary)",
+                              }}
+                            >
+                              {prefs.teeTime === "morning"
+                                ? "🌅 Morning"
+                                : prefs.teeTime === "midday"
+                                ? "☀️ Midday"
+                                : "🌇 Twilight"}
+                            </span>
+                          )}
+                          {prefs.coursePreference && (
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                background: "var(--color-primary-soft)",
+                                borderRadius: 12,
+                                color: "var(--color-primary)",
+                                maxWidth: 200,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={prefs.coursePreference}
+                            >
+                              📍 {prefs.coursePreference}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <button className="btn btn-ghost btn-sm press-effect" onClick={() => removePlayer(uid)}>
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+                  );
+                })}
+              </div>
+            </>
+          )}
       </div>
     </div>
   );
