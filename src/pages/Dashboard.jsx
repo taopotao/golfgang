@@ -138,6 +138,38 @@ export default function Dashboard() {
     eventsByDay[key].push(ev);
   });
 
+  // Event card styles based on booked status
+  const getEventCardStyle = (isBooked, myStatus) => {
+    const baseStyle = {
+      textDecoration: "none",
+      display: 'block',
+      padding: 16,
+      borderRadius: 'var(--radius-lg)',
+      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      position: 'relative',
+      overflow: 'hidden',
+    };
+
+    if (isBooked) {
+      // BOOKED: Green theme - very obvious
+      return {
+        ...baseStyle,
+        background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+        border: '2px solid #4caf50',
+        boxShadow: '0 2px 8px rgba(76, 175, 80, 0.15)',
+      };
+    } else {
+      // PROPOSED: Blue/gray theme - more subtle
+      return {
+        ...baseStyle,
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderLeft: '4px solid #ff9800',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      };
+    }
+  };
+
   return (
     <div className="page">
       <div className="card" style={{ marginBottom: 20 }}>
@@ -188,8 +220,8 @@ export default function Dashboard() {
         </div>
 
         <div className="calendar-legend">
-          <div className="calendar-legend-item"><div className="calendar-legend-dot calendar-legend-dot--proposed" /><span>Proposed</span></div>
-          <div className="calendar-legend-item"><div className="calendar-legend-dot calendar-legend-dot--booked" /><span>Booked</span></div>
+          <div className="calendar-legend-item"><div className="calendar-legend-dot" style={{ background: '#ff9800' }} /><span>Proposed</span></div>
+          <div className="calendar-legend-item"><div className="calendar-legend-dot" style={{ background: '#4caf50' }} /><span>Booked</span></div>
         </div>
       </div>
 
@@ -210,7 +242,7 @@ export default function Dashboard() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[...events].sort((a, b) => a.date.toMillis() - b.date.toMillis()).map((ev) => {
             const dateObj = ev.date.toDate();
             const myStatus = user && ev.responses ? getResponseStatus(ev.responses[user.uid]) : null;
@@ -222,41 +254,107 @@ export default function Dashboard() {
               <Link 
                 key={ev.id} 
                 to={`/event/${ev.id}`} 
-                style={{ 
-                  textDecoration: "none",
-                  display: 'block',
-                  padding: 14,
-                  background: 'var(--color-surface)',
-                  borderRadius: 'var(--radius-lg)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-                  border: '1px solid var(--color-border-subtle)',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                }}
+                style={getEventCardStyle(ev.booked, myStatus)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = ev.booked 
+                    ? '0 6px 16px rgba(76, 175, 80, 0.25)' 
+                    : '0 4px 12px rgba(0,0,0,0.1)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.boxShadow = ev.booked 
+                    ? '0 2px 8px rgba(76, 175, 80, 0.15)' 
+                    : '0 1px 3px rgba(0,0,0,0.06)';
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 500, color: "var(--color-text)" }}>{ev.title}</span>
-                  <span className={`status-badge ${ev.booked ? "status-badge--booked" : "status-badge--proposed"}`}>{ev.booked ? "Booked" : "Open"}</span>
-                </div>
-                <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                  {dateObj.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
-                  {ev.tee && ` • ${ev.tee}`}
-                  {ev.courseName && ` • ${ev.courseName}`}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12 }}>
-                    <span style={{ color: "var(--color-text-tertiary)" }}>👥 {attendingCount}/4</span>
-                    {myStatus === 'available' && <span style={{ color: "var(--color-success)", fontWeight: 500 }}>✓ You're in</span>}
-                    {!myStatus && !ev.booked && <span style={{ color: "var(--color-primary)", fontWeight: 500 }}>Awaiting response</span>}
+                {/* Status indicator bar for booked events */}
+                {ev.booked && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 4,
+                    background: '#4caf50',
+                  }} />
+                )}
+
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ 
+                      fontWeight: 600, 
+                      fontSize: 15,
+                      color: "var(--color-text)",
+                      display: 'block',
+                      marginBottom: 4,
+                    }}>
+                      {ev.title}
+                    </span>
+                    <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                      {dateObj.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
+                      {ev.tee && ` • ${ev.tee}`}
+                    </div>
+                    {ev.courseName && (
+                      <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>
+                        📍 {ev.courseName}
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: 16, color: "var(--color-text-tertiary)" }}>→</span>
+                  
+                  {/* Status badge - much more prominent */}
+                  <div style={{
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    whiteSpace: 'nowrap',
+                    ...(ev.booked ? {
+                      background: '#4caf50',
+                      color: 'white',
+                    } : {
+                      background: '#fff3e0',
+                      color: '#e65100',
+                      border: '1px solid #ffcc80',
+                    })
+                  }}>
+                    {ev.booked ? '✓ Booked' : 'Proposed'}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
+                    <span style={{ 
+                      color: "var(--color-text-secondary)",
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}>
+                      👥 {attendingCount}/4
+                    </span>
+                    {myStatus === 'available' && (
+                      <span style={{ 
+                        color: "#4caf50", 
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}>
+                        ✓ You're in
+                      </span>
+                    )}
+                    {!myStatus && !ev.booked && (
+                      <span style={{ 
+                        color: "#e65100", 
+                        fontWeight: 500,
+                      }}>
+                        Awaiting your response
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 18, color: "var(--color-text-tertiary)" }}>→</span>
                 </div>
               </Link>
             );
@@ -276,16 +374,50 @@ export default function Dashboard() {
                     : 0;
                   const myStatus = user && ev.responses ? getResponseStatus(ev.responses[user.uid]) : null;
                   return (
-                    <Link key={ev.id} to={`/event/${ev.id}`} onClick={() => setShowDayModal(false)} style={{ display: "block", padding: 14, background: "var(--color-bg-tertiary)", borderRadius: 8, marginBottom: 8, textDecoration: "none", color: "inherit", borderLeft: myStatus === 'available' ? "3px solid var(--color-success)" : "3px solid transparent" }}>
+                    <Link 
+                      key={ev.id} 
+                      to={`/event/${ev.id}`} 
+                      onClick={() => setShowDayModal(false)} 
+                      style={{ 
+                        display: "block", 
+                        padding: 14, 
+                        borderRadius: 8, 
+                        marginBottom: 8, 
+                        textDecoration: "none", 
+                        color: "inherit",
+                        ...(ev.booked ? {
+                          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                          border: '2px solid #4caf50',
+                        } : {
+                          background: "var(--color-bg-tertiary)",
+                          borderLeft: "4px solid #ff9800",
+                        })
+                      }}
+                    >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                         <span style={{ fontWeight: 500 }}>{ev.title}</span>
-                        <span className={`status-badge ${ev.booked ? "status-badge--booked" : "status-badge--proposed"}`}>{ev.booked ? "Booked" : "Open"}</span>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: 12,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          ...(ev.booked ? {
+                            background: '#4caf50',
+                            color: 'white',
+                          } : {
+                            background: '#fff3e0',
+                            color: '#e65100',
+                          })
+                        }}>
+                          {ev.booked ? "Booked" : "Proposed"}
+                        </span>
                       </div>
                       {ev.tee && <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>🕐 {ev.tee}</div>}
                       {ev.courseName && <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>📍 {ev.courseName}</div>}
                       <div style={{ marginTop: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
                         <span>👥 {attendingCount}/4</span>
-                        {myStatus === 'available' && <span style={{ color: "var(--color-success)" }}>✓ You're in</span>}
+                        {myStatus === 'available' && <span style={{ color: "#4caf50", fontWeight: 600 }}>✓ You're in</span>}
                       </div>
                     </Link>
                   );
@@ -313,12 +445,14 @@ export default function Dashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div><label>Event title</label><input className="input" value={title} placeholder="e.g. Sunday Stableford" onChange={(e) => setTitle(e.target.value)} /></div>
               <div><label>Course</label><CourseAutocomplete initialValue={course.name} onSelect={(payload) => setCourse(payload)} /></div>
-              <div><label>Tee time</label><input className="input" value={tee} placeholder="e.g. 7:15am" onChange={(e) => setTee(e.target.value)} /></div>
-              <div><label>Notes (optional)</label><textarea className="input" placeholder="Add any notes..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
-              <div><label>RSVP Deadline</label><input className="input" type="date" value={rsvpDeadline} onChange={(e) => setRsvpDeadline(e.target.value)} /></div>
+              <div><label>Tee time</label><input className="input" value={tee} placeholder="e.g. 6:30 AM" onChange={(e) => setTee(e.target.value)} /></div>
+              <div><label>RSVP Deadline (optional)</label><input className="input" type="date" value={rsvpDeadline} onChange={(e) => setRsvpDeadline(e.target.value)} /></div>
+              <div><label>Notes (optional)</label><textarea className="input" rows={2} value={notes} placeholder="Any extra details..." onChange={(e) => setNotes(e.target.value)} /></div>
             </div>
-            <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
-              <button className="btn btn-primary hover-lift press-effect" style={{ flex: 1 }} onClick={createEvent} disabled={creating}>{creating ? "Creating…" : "Create Event"}</button>
+            <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+              <button className="btn btn-primary hover-lift press-effect" style={{ flex: 1 }} onClick={createEvent} disabled={creating || !title.trim()}>
+                {creating ? "Creating..." : "Create Event"}
+              </button>
               <button className="btn btn-ghost press-effect" onClick={() => setShowCreateModal(false)}>Cancel</button>
             </div>
           </div>

@@ -33,6 +33,38 @@ export default function MyEvents() {
     })
     .sort((a, b) => a.date.toMillis() - b.date.toMillis());
 
+  // Event card styles based on booked status
+  const getEventCardStyle = (isBooked) => {
+    const baseStyle = {
+      textDecoration: "none",
+      display: 'block',
+      padding: 16,
+      borderRadius: 'var(--radius-lg)',
+      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      position: 'relative',
+      overflow: 'hidden',
+    };
+
+    if (isBooked) {
+      // BOOKED: Green theme - very obvious
+      return {
+        ...baseStyle,
+        background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+        border: '2px solid #4caf50',
+        boxShadow: '0 2px 8px rgba(76, 175, 80, 0.15)',
+      };
+    } else {
+      // PROPOSED: Orange/neutral theme
+      return {
+        ...baseStyle,
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderLeft: '4px solid #ff9800',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      };
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -69,7 +101,7 @@ export default function MyEvents() {
           </Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {myEvents.map((ev) => {
             const dateObj = ev.date.toDate();
             const attendingCount = ev.responses 
@@ -79,43 +111,98 @@ export default function MyEvents() {
             return (
               <Link 
                 key={ev.id} 
-                to={`/event/${ev.id}`} 
-                style={{ 
-                  textDecoration: "none",
-                  display: 'block',
-                  padding: 14,
-                  background: 'var(--color-surface)',
-                  borderRadius: 'var(--radius-lg)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-                  border: '1px solid var(--color-border-subtle)',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                }}
+                to={`/event/${ev.id}`}
+                style={getEventCardStyle(ev.booked)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = ev.booked 
+                    ? '0 6px 16px rgba(76, 175, 80, 0.25)' 
+                    : '0 4px 12px rgba(0,0,0,0.1)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.boxShadow = ev.booked 
+                    ? '0 2px 8px rgba(76, 175, 80, 0.15)' 
+                    : '0 1px 3px rgba(0,0,0,0.06)';
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 500, color: "var(--color-text)" }}>{ev.title}</span>
-                  <span className={`status-badge ${ev.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
-                    {ev.booked ? "Booked" : "Open"}
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                  {dateObj.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
-                  {ev.tee && ` • ${ev.tee}`}
-                  {ev.courseName && ` • ${ev.courseName}`}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12 }}>
-                    <span style={{ color: "var(--color-text-tertiary)" }}>👥 {attendingCount}/4</span>
-                    <span style={{ color: "var(--color-success)", fontWeight: 500 }}>✓ You're in</span>
+                {/* Status indicator bar for booked events */}
+                {ev.booked && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 4,
+                    background: '#4caf50',
+                  }} />
+                )}
+
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ 
+                      fontWeight: 600, 
+                      fontSize: 15,
+                      color: "var(--color-text)",
+                      display: 'block',
+                      marginBottom: 4,
+                    }}>
+                      {ev.title}
+                    </span>
+                    <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                      {dateObj.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
+                      {ev.tee && ` • ${ev.tee}`}
+                    </div>
+                    {ev.courseName && (
+                      <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>
+                        📍 {ev.courseName}
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: 16, color: "var(--color-text-tertiary)" }}>→</span>
+                  
+                  {/* Status badge - much more prominent */}
+                  <div style={{
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    whiteSpace: 'nowrap',
+                    ...(ev.booked ? {
+                      background: '#4caf50',
+                      color: 'white',
+                    } : {
+                      background: '#fff3e0',
+                      color: '#e65100',
+                      border: '1px solid #ffcc80',
+                    })
+                  }}>
+                    {ev.booked ? '✓ Booked' : 'Proposed'}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
+                    <span style={{ 
+                      color: "var(--color-text-secondary)",
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}>
+                      👥 {attendingCount}/4
+                    </span>
+                    <span style={{ 
+                      color: "#4caf50", 
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}>
+                      ✓ You're in
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 18, color: "var(--color-text-tertiary)" }}>→</span>
                 </div>
               </Link>
             );
