@@ -147,6 +147,30 @@ export default function Navbar() {
                   >
                     👤 Profile
                   </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate('/admin');
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '10px 12px',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        fontSize: 'var(--text-sm)',
+                        color: 'var(--color-text)',
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = 'var(--color-bg-hover)'}
+                      onMouseLeave={(e) => e.target.style.background = 'none'}
+                    >
+                      ⚙️ Admin
+                    </button>
+                  )}
                   <button
                     onClick={handleLogout}
                     style={{
