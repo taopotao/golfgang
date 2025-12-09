@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import BottomNav from './components/BottomNav'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import MyEvents from './pages/MyEvents'
 import EventPage from "./pages/event/EventPage";
 import Admin from './pages/Admin'
 import NotFound from './pages/NotFound'
@@ -23,6 +24,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Dashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/my-events"
+            element={
+              <RequireAuth>
+                <MyEvents />
               </RequireAuth>
             }
           />

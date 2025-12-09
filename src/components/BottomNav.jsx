@@ -18,7 +18,7 @@ export default function BottomNav() {
 
   const navItems = [
     { path: '/', icon: '🏠', label: 'Home' },
-    { path: '/profile', icon: '👤', label: 'Profile' },
+    { path: '/my-events', icon: '✓', label: 'My RSVPs' },
   ];
 
   const isActive = (path) => {
