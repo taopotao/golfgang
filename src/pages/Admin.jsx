@@ -3,10 +3,48 @@ import { db } from "../firebase";
 import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { Link } from "react-router-dom";
 
+// Helper to get two initials from name/email
+const getInitials = (name) => {
+  if (!name) return "??";
+  const parts = name.split(/[\s@._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
+// Consistent avatar colours based on name
+const getAvatarColor = (name) => {
+  const colors = [
+    ['#10b981', '#059669'], // green
+    ['#3b82f6', '#2563eb'], // blue
+    ['#8b5cf6', '#7c3aed'], // purple
+    ['#f59e0b', '#d97706'], // amber
+    ['#ec4899', '#db2777'], // pink
+    ['#06b6d4', '#0891b2'], // cyan
+    ['#f97316', '#ea580c'], // orange
+  ];
+  const index = (name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+  return colors[index];
+};
+
 export default function Admin() {
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Colour palette matching Dashboard
+  const colors = {
+    booked: {
+      badge: '#059669',
+      badgeText: '#ffffff',
+    },
+    proposed: {
+      badge: '#eff6ff',
+      badgeText: '#2563eb',
+      badgeBorder: '#bfdbfe',
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -92,7 +130,21 @@ export default function Admin() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                     <span style={{ fontWeight: 500 }}>{ev.title}</span>
-                    <span className={`status-badge ${ev.booked ? "status-badge--booked" : "status-badge--proposed"}`}>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      ...(ev.booked ? {
+                        background: colors.booked.badge,
+                        color: colors.booked.badgeText,
+                      } : {
+                        background: colors.proposed.badge,
+                        color: colors.proposed.badgeText,
+                        border: `1px solid ${colors.proposed.badgeBorder}`,
+                      })
+                    }}>
                       {ev.booked ? "Booked" : "Proposed"}
                     </span>
                   </div>
@@ -105,7 +157,11 @@ export default function Admin() {
                   <Link to={`/event/${ev.id}`} className="btn btn-ghost btn-sm">
                     Open
                   </Link>
-                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--color-danger)" }} onClick={() => deleteEvent(ev.id)}>
+                  <button 
+                    className="btn btn-ghost btn-sm" 
+                    style={{ color: "var(--color-danger)" }} 
+                    onClick={() => deleteEvent(ev.id)}
+                  >
                     Delete
                   </button>
                 </div>
@@ -122,48 +178,66 @@ export default function Admin() {
           <span className="section-count">{users.length}</span>
         </div>
 
-        {users.map((u, idx) => (
-          <div
-            key={u.id}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "12px 0",
-              borderBottom: idx < users.length - 1 ? "1px solid var(--color-divider)" : "none",
-              gap: 12,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div className="avatar">
-                {(u.username || u.email || "?").charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <span style={{ fontWeight: 500 }}>{u.username || u.email}</span>
-                {u.isAdmin && (
-                  <span style={{
-                    marginLeft: 8,
-                    fontSize: 11,
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    background: "var(--color-primary-soft)",
-                    color: "var(--color-primary)",
-                    fontWeight: 500,
-                  }}>
-                    Admin
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => toggleAdmin(u.id, u.isAdmin)}
+        {users.map((u, idx) => {
+          const displayName = u.username || u.email || "?";
+          const initials = getInitials(displayName);
+          const [colorLight, colorDark] = getAvatarColor(displayName);
+          
+          return (
+            <div
+              key={u.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "12px 0",
+                borderBottom: idx < users.length - 1 ? "1px solid var(--color-divider)" : "none",
+                gap: 12,
+              }}
             >
-              {u.isAdmin ? "Remove Admin" : "Make Admin"}
-            </button>
-          </div>
-        ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${colorLight} 0%, ${colorDark} 100%)`,
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  flexShrink: 0,
+                }}>
+                  {initials}
+                </div>
+                <div>
+                  <span style={{ fontWeight: 500 }}>{displayName}</span>
+                  {u.isAdmin && (
+                    <span style={{
+                      marginLeft: 8,
+                      fontSize: 11,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      background: "var(--color-primary-soft)",
+                      color: "var(--color-primary)",
+                      fontWeight: 500,
+                    }}>
+                      Admin
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => toggleAdmin(u.id, u.isAdmin)}
+              >
+                {u.isAdmin ? "Remove Admin" : "Make Admin"}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

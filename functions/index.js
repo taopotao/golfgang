@@ -446,3 +446,45 @@ exports.triggerRsvpReminder = onCall(async (request) => {
         usersFailed: result.failureCount
     };
 });
+
+// 5. Automatically delete past events (runs daily at midnight Sydney time)
+exports.cleanupPastEvents = onSchedule({
+    schedule: "every day 00:00",
+    timeZone: "Australia/Sydney",
+}, async () => {
+    console.log("Running past events cleanup");
+
+    // Delete events older than 7 days - change this number to keep events longer/shorter
+    const DAYS_TO_KEEP = 1;
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - DAYS_TO_KEEP);
+    cutoffDate.setHours(0, 0, 0, 0);
+
+    try {
+        const pastEventsSnapshot = await db.collection("events")
+            .where("date", "<", cutoffDate)
+            .get();
+
+        if (pastEventsSnapshot.empty) {
+            console.log("No past events to delete");
+            return;
+        }
+
+        const batch = db.batch();
+        let deleteCount = 0;
+
+        pastEventsSnapshot.forEach((doc) => {
+            console.log(`Deleting event: ${doc.id} - ${doc.data().title}`);
+            batch.delete(doc.ref);
+            deleteCount++;
+        });
+
+        await batch.commit();
+        console.log(`Successfully deleted ${deleteCount} past events`);
+
+    } catch (error) {
+        console.error("Error cleaning up past events:", error);
+        throw error;
+    }
+});

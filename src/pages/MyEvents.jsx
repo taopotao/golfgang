@@ -33,34 +33,50 @@ export default function MyEvents() {
     })
     .sort((a, b) => a.date.toMillis() - b.date.toMillis());
 
+  // Refined colour palette - matches Dashboard
+  const colors = {
+    booked: {
+      bg: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+      border: '#10b981',
+      badge: '#059669',
+      badgeText: '#ffffff',
+    },
+    proposed: {
+      bg: '#ffffff',
+      border: '#e5e7eb',
+      accent: '#3b82f6',
+      badge: '#eff6ff',
+      badgeText: '#2563eb',
+      badgeBorder: '#bfdbfe',
+    }
+  };
+
   // Event card styles based on booked status
   const getEventCardStyle = (isBooked) => {
     const baseStyle = {
       textDecoration: "none",
       display: 'block',
       padding: 16,
-      borderRadius: 'var(--radius-lg)',
+      borderRadius: 12,
       transition: 'transform 0.15s ease, box-shadow 0.15s ease',
       position: 'relative',
       overflow: 'hidden',
     };
 
     if (isBooked) {
-      // BOOKED: Green theme - very obvious
       return {
         ...baseStyle,
-        background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
-        border: '2px solid #4caf50',
-        boxShadow: '0 2px 8px rgba(76, 175, 80, 0.15)',
+        background: colors.booked.bg,
+        border: `2px solid ${colors.booked.border}`,
+        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
       };
     } else {
-      // PROPOSED: Orange/neutral theme
       return {
         ...baseStyle,
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderLeft: '4px solid #ff9800',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        background: colors.proposed.bg,
+        border: `1px solid ${colors.proposed.border}`,
+        borderLeft: `4px solid ${colors.proposed.accent}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       };
     }
   };
@@ -116,14 +132,14 @@ export default function MyEvents() {
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
                   e.currentTarget.style.boxShadow = ev.booked 
-                    ? '0 6px 16px rgba(76, 175, 80, 0.25)' 
-                    : '0 4px 12px rgba(0,0,0,0.1)';
+                    ? '0 6px 16px rgba(16, 185, 129, 0.2)' 
+                    : '0 4px 12px rgba(0,0,0,0.08)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
                   e.currentTarget.style.boxShadow = ev.booked 
-                    ? '0 2px 8px rgba(76, 175, 80, 0.15)' 
-                    : '0 1px 3px rgba(0,0,0,0.06)';
+                    ? '0 2px 8px rgba(16, 185, 129, 0.12)' 
+                    : '0 1px 3px rgba(0,0,0,0.05)';
                 }}
               >
                 {/* Status indicator bar for booked events */}
@@ -133,8 +149,8 @@ export default function MyEvents() {
                     top: 0,
                     left: 0,
                     right: 0,
-                    height: 4,
-                    background: '#4caf50',
+                    height: 3,
+                    background: colors.booked.border,
                   }} />
                 )}
 
@@ -160,22 +176,22 @@ export default function MyEvents() {
                     )}
                   </div>
                   
-                  {/* Status badge - much more prominent */}
+                  {/* Status badge */}
                   <div style={{
-                    padding: '6px 12px',
-                    borderRadius: 20,
+                    padding: '5px 10px',
+                    borderRadius: 6,
                     fontSize: 11,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
+                    letterSpacing: '0.3px',
                     whiteSpace: 'nowrap',
                     ...(ev.booked ? {
-                      background: '#4caf50',
-                      color: 'white',
+                      background: colors.booked.badge,
+                      color: colors.booked.badgeText,
                     } : {
-                      background: '#fff3e0',
-                      color: '#e65100',
-                      border: '1px solid #ffcc80',
+                      background: colors.proposed.badge,
+                      color: colors.proposed.badgeText,
+                      border: `1px solid ${colors.proposed.badgeBorder}`,
                     })
                   }}>
                     {ev.booked ? '✓ Booked' : 'Proposed'}
@@ -193,7 +209,7 @@ export default function MyEvents() {
                       👥 {attendingCount}/4
                     </span>
                     <span style={{ 
-                      color: "#4caf50", 
+                      color: colors.booked.badge, 
                       fontWeight: 600,
                       display: 'flex',
                       alignItems: 'center',

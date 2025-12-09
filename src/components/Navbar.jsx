@@ -1,19 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
+import { getInitials, getAvatarStyle } from '../utils/avatarUtils';
 
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, profile, isAdmin, logout } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
-  // Get user initial for avatar
-  const getUserInitial = () => {
-    if (!user) return '?';
-    const name = user.displayName || user.email || '';
-    return name.charAt(0).toUpperCase();
+  // Get display name - use username from profile (same as EventPage uses)
+  const getDisplayName = () => {
+    if (!user) return '';
+    // Use profile.username first (this is what EventPage uses via allUsers)
+    // Fall back to email prefix if no username
+    if (profile?.username) return profile.username;
+    if (user.email) return user.email.split('@')[0];
+    return user.displayName || '';
   };
 
   // Close menu when clicking outside
@@ -32,6 +36,8 @@ export default function Navbar() {
     await logout();
     navigate('/login');
   };
+
+  const displayName = getDisplayName();
 
   return (
     <nav className="top-nav">
@@ -80,12 +86,17 @@ export default function Navbar() {
           {user ? (
             <div ref={menuRef} style={{ position: 'relative' }}>
               <div 
-                className="header-avatar"
                 onClick={() => setShowMenu(!showMenu)}
                 title="Menu"
-                style={{ cursor: 'pointer' }}
+                style={{ 
+                  ...getAvatarStyle(displayName, 36),
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                {getUserInitial()}
+                {getInitials(displayName)}
               </div>
               
               {showMenu && (
@@ -108,7 +119,7 @@ export default function Navbar() {
                     borderBottom: '1px solid var(--color-border)',
                     marginBottom: 6,
                   }}>
-                    {user.displayName || user.email}
+                    {profile?.username || user.email}
                   </div>
                   <button
                     onClick={() => {

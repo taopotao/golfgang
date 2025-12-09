@@ -9,8 +9,8 @@ import { showToast, hapticFeedback } from "../utils/uiEffects";
 // Helper to get status from response (handles both old string format and new object format)
 const getResponseStatus = (response) => {
   if (!response) return null;
-  if (typeof response === 'string') return response; // Legacy format: "available"
-  return response.status; // New format: { status: "available", preferences: {...} }
+  if (typeof response === 'string') return response;
+  return response.status;
 };
 
 export default function Dashboard() {
@@ -138,34 +138,54 @@ export default function Dashboard() {
     eventsByDay[key].push(ev);
   });
 
+  // Refined colour palette - green & blue theme
+  const colors = {
+    booked: {
+      bg: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+      border: '#10b981',
+      badge: '#059669',
+      badgeText: '#ffffff',
+      soft: 'rgba(16, 185, 129, 0.1)',
+      dot: '#10b981',
+    },
+    proposed: {
+      bg: '#ffffff',
+      border: '#e5e7eb',
+      accent: '#3b82f6',
+      badge: '#eff6ff',
+      badgeText: '#2563eb',
+      badgeBorder: '#bfdbfe',
+      soft: 'rgba(59, 130, 246, 0.1)',
+      dot: '#3b82f6',
+    }
+  };
+
   // Event card styles based on booked status
-  const getEventCardStyle = (isBooked, myStatus) => {
+  const getEventCardStyle = (isBooked) => {
     const baseStyle = {
       textDecoration: "none",
       display: 'block',
       padding: 16,
-      borderRadius: 'var(--radius-lg)',
+      borderRadius: 12,
       transition: 'transform 0.15s ease, box-shadow 0.15s ease',
       position: 'relative',
       overflow: 'hidden',
     };
 
     if (isBooked) {
-      // BOOKED: Green theme - very obvious
       return {
         ...baseStyle,
-        background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
-        border: '2px solid #4caf50',
-        boxShadow: '0 2px 8px rgba(76, 175, 80, 0.15)',
+        background: colors.booked.bg,
+        border: `2px solid ${colors.booked.border}`,
+        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
       };
     } else {
-      // PROPOSED: Blue/gray theme - more subtle
       return {
         ...baseStyle,
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderLeft: '4px solid #ff9800',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        background: colors.proposed.bg,
+        border: `1px solid ${colors.proposed.border}`,
+        borderLeft: `4px solid ${colors.proposed.accent}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       };
     }
   };
@@ -207,21 +227,27 @@ export default function Dashboard() {
             const hasEvents = dayEvents.length > 0;
 
             let bgStyle = {};
-            if (hasBooked) bgStyle = { background: "var(--color-success-soft)" };
-            else if (hasProposed) bgStyle = { background: "var(--color-warning-soft)" };
+            if (hasBooked) bgStyle = { background: colors.booked.soft };
+            else if (hasProposed) bgStyle = { background: colors.proposed.soft };
 
             return (
               <div key={day} onClick={() => openDayModal(day)} className="calendar-day" style={{ aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 6, cursor: "pointer", border: isToday ? "2px solid var(--color-primary)" : "1px solid transparent", ...bgStyle }}>
                 <div style={{ fontSize: 14, fontWeight: isToday ? 600 : 400, color: isToday ? "var(--color-primary)" : "var(--color-text)" }}>{day}</div>
-                {hasEvents && <div style={{ width: 6, height: 6, borderRadius: "50%", marginTop: 2, background: hasBooked ? "var(--color-success)" : "var(--color-warning)" }} />}
+                {hasEvents && <div style={{ width: 6, height: 6, borderRadius: "50%", marginTop: 2, background: hasBooked ? colors.booked.dot : colors.proposed.dot }} />}
               </div>
             );
           })}
         </div>
 
         <div className="calendar-legend">
-          <div className="calendar-legend-item"><div className="calendar-legend-dot" style={{ background: '#ff9800' }} /><span>Proposed</span></div>
-          <div className="calendar-legend-item"><div className="calendar-legend-dot" style={{ background: '#4caf50' }} /><span>Booked</span></div>
+          <div className="calendar-legend-item">
+            <div className="calendar-legend-dot" style={{ background: colors.proposed.dot }} />
+            <span>Proposed</span>
+          </div>
+          <div className="calendar-legend-item">
+            <div className="calendar-legend-dot" style={{ background: colors.booked.dot }} />
+            <span>Booked</span>
+          </div>
         </div>
       </div>
 
@@ -254,18 +280,18 @@ export default function Dashboard() {
               <Link 
                 key={ev.id} 
                 to={`/event/${ev.id}`} 
-                style={getEventCardStyle(ev.booked, myStatus)}
+                style={getEventCardStyle(ev.booked)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
                   e.currentTarget.style.boxShadow = ev.booked 
-                    ? '0 6px 16px rgba(76, 175, 80, 0.25)' 
-                    : '0 4px 12px rgba(0,0,0,0.1)';
+                    ? '0 6px 16px rgba(16, 185, 129, 0.2)' 
+                    : '0 4px 12px rgba(0,0,0,0.08)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
                   e.currentTarget.style.boxShadow = ev.booked 
-                    ? '0 2px 8px rgba(76, 175, 80, 0.15)' 
-                    : '0 1px 3px rgba(0,0,0,0.06)';
+                    ? '0 2px 8px rgba(16, 185, 129, 0.12)' 
+                    : '0 1px 3px rgba(0,0,0,0.05)';
                 }}
               >
                 {/* Status indicator bar for booked events */}
@@ -275,8 +301,8 @@ export default function Dashboard() {
                     top: 0,
                     left: 0,
                     right: 0,
-                    height: 4,
-                    background: '#4caf50',
+                    height: 3,
+                    background: colors.booked.border,
                   }} />
                 )}
 
@@ -302,22 +328,22 @@ export default function Dashboard() {
                     )}
                   </div>
                   
-                  {/* Status badge - much more prominent */}
+                  {/* Status badge */}
                   <div style={{
-                    padding: '6px 12px',
-                    borderRadius: 20,
+                    padding: '5px 10px',
+                    borderRadius: 6,
                     fontSize: 11,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
+                    letterSpacing: '0.3px',
                     whiteSpace: 'nowrap',
                     ...(ev.booked ? {
-                      background: '#4caf50',
-                      color: 'white',
+                      background: colors.booked.badge,
+                      color: colors.booked.badgeText,
                     } : {
-                      background: '#fff3e0',
-                      color: '#e65100',
-                      border: '1px solid #ffcc80',
+                      background: colors.proposed.badge,
+                      color: colors.proposed.badgeText,
+                      border: `1px solid ${colors.proposed.badgeBorder}`,
                     })
                   }}>
                     {ev.booked ? '✓ Booked' : 'Proposed'}
@@ -336,7 +362,7 @@ export default function Dashboard() {
                     </span>
                     {myStatus === 'available' && (
                       <span style={{ 
-                        color: "#4caf50", 
+                        color: colors.booked.badge, 
                         fontWeight: 600,
                         display: 'flex',
                         alignItems: 'center',
@@ -347,7 +373,7 @@ export default function Dashboard() {
                     )}
                     {!myStatus && !ev.booked && (
                       <span style={{ 
-                        color: "#e65100", 
+                        color: colors.proposed.badgeText, 
                         fontWeight: 500,
                       }}>
                         Awaiting your response
@@ -386,28 +412,29 @@ export default function Dashboard() {
                         textDecoration: "none", 
                         color: "inherit",
                         ...(ev.booked ? {
-                          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
-                          border: '2px solid #4caf50',
+                          background: colors.booked.bg,
+                          border: `2px solid ${colors.booked.border}`,
                         } : {
                           background: "var(--color-bg-tertiary)",
-                          borderLeft: "4px solid #ff9800",
+                          borderLeft: `4px solid ${colors.proposed.accent}`,
                         })
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                         <span style={{ fontWeight: 500 }}>{ev.title}</span>
                         <span style={{
-                          padding: '4px 10px',
-                          borderRadius: 12,
+                          padding: '4px 8px',
+                          borderRadius: 6,
                           fontSize: 10,
-                          fontWeight: 700,
+                          fontWeight: 600,
                           textTransform: 'uppercase',
                           ...(ev.booked ? {
-                            background: '#4caf50',
-                            color: 'white',
+                            background: colors.booked.badge,
+                            color: colors.booked.badgeText,
                           } : {
-                            background: '#fff3e0',
-                            color: '#e65100',
+                            background: colors.proposed.badge,
+                            color: colors.proposed.badgeText,
+                            border: `1px solid ${colors.proposed.badgeBorder}`,
                           })
                         }}>
                           {ev.booked ? "Booked" : "Proposed"}
@@ -417,7 +444,7 @@ export default function Dashboard() {
                       {ev.courseName && <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>📍 {ev.courseName}</div>}
                       <div style={{ marginTop: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
                         <span>👥 {attendingCount}/4</span>
-                        {myStatus === 'available' && <span style={{ color: "#4caf50", fontWeight: 600 }}>✓ You're in</span>}
+                        {myStatus === 'available' && <span style={{ color: colors.booked.badge, fontWeight: 600 }}>✓ You're in</span>}
                       </div>
                     </Link>
                   );

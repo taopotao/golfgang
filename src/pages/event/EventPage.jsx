@@ -18,6 +18,7 @@ import PlacePhoto from "../../components/PlacePhoto";
 import GolfConditions from "../../components/GolfConditions";
 import RSVPPreferencesModal from "../../components/RSVPPreferencesModal";
 import { triggerConfetti, showToast, hapticFeedback } from "../../utils/uiEffects";
+import { getInitials, getAvatarStyle } from "../../utils/avatarUtils";
 
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
@@ -375,6 +376,14 @@ export default function EventPage() {
   const getUserName = (uid) => {
     const u = allUsers.find((x) => x.id === uid);
     return u?.username || u?.email?.split("@")[0] || "Unknown";
+  };
+
+  const getUserInitials = (uid) => {
+  return getInitials(getUserName(uid));
+  };
+
+  const getUserAvatarStyle = (uid, size = 36) => {
+  return getAvatarStyle(getUserName(uid), size);
   };
 
   const mapsUrl = buildGoogleMapsUrl(event.coursePlaceId, event.courseName);
@@ -895,9 +904,9 @@ export default function EventPage() {
                 <div key={uid} className="player-item" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div className="player-info">
-                      <div className={`player-avatar ${isYou ? "player-avatar--you" : ""}`}>
-                        {getUserName(uid).charAt(0).toUpperCase()}
-                      </div>
+                      <div style={getUserAvatarStyle(uid, 36)}>
+                        {getUserInitials(uid)}
+                          </div>
                       <span className="player-name">
                         {getUserName(uid)}
                         {isYou && <span className="player-badge">You</span>}
