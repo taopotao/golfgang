@@ -1,16 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
-import { useTheme } from '../providers/ThemeProvider';
-
-// Import your logo - uncomment and adjust path if you have one:
-// import logoImg from '../assets/golfgang-logo.png';
 
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, logout } = useAuth();
-  const { toggleTheme, isDark } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -41,7 +36,7 @@ export default function Navbar() {
   return (
     <nav className="top-nav">
       <div className="top-nav-inner">
-        {/* Logo / Brand - using text, replace with image if you have one */}
+        {/* Logo / Brand */}
         <Link to="/" className="top-nav-left">
           <span style={{ 
             fontFamily: 'var(--font-display)', 
@@ -80,16 +75,6 @@ export default function Navbar() {
               </div>
             </>
           )}
-
-          {/* Theme toggle */}
-          <button 
-            className="theme-toggle"
-            onClick={toggleTheme}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark ? '☀️' : '🌙'}
-          </button>
 
           {/* User avatar / Login */}
           {user ? (
