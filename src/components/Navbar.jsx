@@ -1,284 +1,93 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../providers/AuthProvider";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
-import { useState } from "react";
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../providers/AuthProvider';
+import { useTheme } from '../providers/ThemeProvider';
+
+// Import your logo - uncomment and adjust path if you have one:
+// import logoImg from '../assets/golfgang-logo.png';
 
 export default function Navbar() {
-  const { user, isAdmin } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
-  
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
+  const { toggleTheme, isDark } = useTheme();
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/login");
+  // Get user initial for avatar
+  const getUserInitial = () => {
+    if (!user) return '?';
+    const name = user.displayName || user.email || '';
+    return name.charAt(0).toUpperCase();
   };
 
-  const closeMenu = () => setMobileMenuOpen(false);
-
   return (
-    <>
-      <style>{`
-        .nav-desktop {
-          display: flex;
-        }
-        .nav-mobile-burger {
-          display: none;
-        }
-        @media (max-width: 768px) {
-          .nav-desktop {
-            display: none !important;
-          }
-          .nav-mobile-burger {
-            display: flex !important;
-          }
-          .mobile-menu-overlay {
-            display: flex;
-          }
-        }
-        @media (min-width: 769px) {
-          .mobile-menu-overlay {
-            display: none !important;
-          }
-        }
-      `}</style>
-      
-      <header className="top-nav">
-        <div className="top-nav-inner">
-          {/* LEFT — Brand Title */}
-          <Link 
-            to="/" 
-            className="top-nav-left" 
-            style={{ 
-              textDecoration: 'none',
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: 'var(--color-primary)',
-              fontFamily: 'var(--font-display)',
-            }}
-          >
-            GolfGang
-          </Link>
-
-          {/* RIGHT — Desktop menu */}
-          <div className="top-nav-right nav-desktop" style={{
+    <nav className="top-nav">
+      <div className="top-nav-inner">
+        {/* Logo / Brand - using text, replace with image if you have one */}
+        <Link to="/" className="top-nav-left">
+          <span style={{ 
+            fontFamily: 'var(--font-display)', 
+            fontSize: 'var(--text-xl)',
+            fontWeight: 700,
+            color: 'var(--color-primary)',
             display: 'flex',
             alignItems: 'center',
-            gap: 16,
+            gap: '8px',
           }}>
-            {user && (
-              <>
-                <nav className="top-nav-links" style={{ display: 'flex', gap: 16 }}>
-                  <Link to="/" className={location.pathname === "/" ? "active" : undefined}>
-                    Calendar
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      className={location.pathname.startsWith("/admin") ? "active" : undefined}
-                    >
-                      Admin
-                    </Link>
-                  )}
-                </nav>
+            <span style={{ fontSize: '24px' }}>⛳</span>
+            GolfGang
+          </span>
+        </Link>
 
-                <button onClick={() => navigate("/profile")} className="btn btn-ghost btn-sm press-effect">
-                  Profile
-                </button>
-
-                <button className="btn btn-ghost btn-sm press-effect" onClick={handleLogout}>
-                  Logout
-                </button>
-              </>
-            )}
-
-            {!user && (
-              <Link to="/login" className="btn btn-primary btn-sm hover-lift">
-                Login
-              </Link>
-            )}
-          </div>
-
-          {/* MOBILE HAMBURGER BUTTON */}
-          {user && (
-            <button
-              className="nav-mobile-burger"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 8,
-                cursor: 'pointer',
-                flexDirection: 'column',
-                gap: 5,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-label="Menu"
-            >
-              <span style={{
-                display: 'block',
-                width: 22,
-                height: 2,
-                background: 'var(--color-text-main)',
-                borderRadius: 2,
-                transition: 'all 0.2s ease',
-                transform: mobileMenuOpen ? 'rotate(45deg) translateY(7px)' : 'none',
-              }} />
-              <span style={{
-                display: 'block',
-                width: 22,
-                height: 2,
-                background: 'var(--color-text-main)',
-                borderRadius: 2,
-                transition: 'all 0.2s ease',
-                opacity: mobileMenuOpen ? 0 : 1,
-              }} />
-              <span style={{
-                display: 'block',
-                width: 22,
-                height: 2,
-                background: 'var(--color-text-main)',
-                borderRadius: 2,
-                transition: 'all 0.2s ease',
-                transform: mobileMenuOpen ? 'rotate(-45deg) translateY(-7px)' : 'none',
-              }} />
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* MOBILE MENU - Full screen overlay */}
-      {mobileMenuOpen && (
-        <div 
-          className="mobile-menu-overlay"
-          style={{
-            position: 'fixed',
-            top: 'var(--nav-height)',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'var(--color-bg)',
-            zIndex: 100,
-            padding: 20,
-            flexDirection: 'column',
-            gap: 8,
-            overflowY: 'auto',
-            animation: 'fade-up 0.2s ease-out',
-          }}
-        >
+        {/* Right side actions */}
+        <div className="top-nav-right">
           {user && (
             <>
-              {/* User info */}
-              <div style={{
-                padding: '16px 0',
-                borderBottom: '1px solid var(--color-border-subtle)',
-                marginBottom: 8,
-              }}>
-                <div style={{ fontWeight: 600, fontSize: 16 }}>
-                  {user.email?.split('@')[0]}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-                  {user.email}
-                  {isAdmin && ' • Admin'}
-                </div>
-              </div>
-
-              {/* Navigation links */}
-              <Link 
-                to="/" 
-                onClick={closeMenu}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '14px 0',
-                  textDecoration: 'none',
-                  color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text-main)',
-                  fontSize: 16,
-                  fontWeight: 500,
-                  transition: 'transform 0.2s ease',
-                }}
-              >
-                📅 Calendar
-              </Link>
-
-              <Link 
-                to="/profile" 
-                onClick={closeMenu}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '14px 0',
-                  textDecoration: 'none',
-                  color: location.pathname === '/profile' ? 'var(--color-primary)' : 'var(--color-text-main)',
-                  fontSize: 16,
-                  fontWeight: 500,
-                }}
-              >
-                👤 Profile
-              </Link>
-
-              {isAdmin && (
+              {/* Desktop nav links */}
+              <div className="top-nav-links desktop-only">
                 <Link 
-                  to="/admin" 
-                  onClick={closeMenu}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '14px 0',
-                    textDecoration: 'none',
-                    color: location.pathname.startsWith('/admin') ? 'var(--color-primary)' : 'var(--color-text-main)',
-                    fontSize: 16,
-                    fontWeight: 500,
-                  }}
+                  to="/" 
+                  className={location.pathname === '/' ? 'active' : ''}
                 >
-                  ⚙️ Admin
+                  Events
                 </Link>
-              )}
-
-              {/* Logout */}
-              <button 
-                onClick={() => { handleLogout(); closeMenu(); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '14px 0',
-                  background: 'none',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  color: 'var(--color-danger)',
-                  fontSize: 16,
-                  fontWeight: 500,
-                  width: '100%',
-                  marginTop: 8,
-                  borderTop: '1px solid var(--color-border-subtle)',
-                  paddingTop: 22,
-                }}
-              >
-                🚪 Logout
-              </button>
+                {isAdmin && (
+                  <Link 
+                    to="/admin" 
+                    className={location.pathname === '/admin' ? 'active' : ''}
+                  >
+                    Admin
+                  </Link>
+                )}
+              </div>
             </>
           )}
 
-          {!user && (
-            <Link
-              to="/login"
-              className="btn btn-primary"
-              onClick={closeMenu}
-              style={{ marginTop: 20 }}
+          {/* Theme toggle */}
+          <button 
+            className="theme-toggle"
+            onClick={toggleTheme}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
+          {/* User avatar / Login */}
+          {user ? (
+            <div 
+              className="header-avatar"
+              onClick={() => navigate('/profile')}
+              title="Profile"
+              style={{ cursor: 'pointer' }}
             >
-              Login
+              {getUserInitial()}
+            </div>
+          ) : (
+            <Link to="/login" className="btn btn-primary btn-sm">
+              Log in
             </Link>
           )}
         </div>
-      )}
-    </>
+      </div>
+    </nav>
   );
 }

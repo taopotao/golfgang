@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import BottomNav from './components/BottomNav'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import EventPage from "./pages/event/EventPage";
@@ -43,34 +44,37 @@ export default function App() {
             }
           />
           {/* 404 */}
-<Route path="/404" element={<NotFound />} />
-<Route path="*" element={<Navigate to="/404" />} />
+          <Route path="/404" element={<NotFound />} />
+          <Route path="*" element={<Navigate to="/404" />} />
 
-{/* Public pages */}
-<Route path="/signup" element={<Signup />} />
-<Route path="/reset-password" element={<ResetPassword />} />
-<Route path="/login" element={<Login />} />
+          {/* Public pages */}
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/login" element={<Login />} />
 
-{/* Auth-only pages */}
-<Route
-  path="/profile"
-  element={
-    <RequireAuth>
-      <Profile />
-    </RequireAuth>
-  }
-/>
+          {/* Auth-only pages */}
+          <Route
+            path="/profile"
+            element={
+              <RequireAuth>
+                <Profile />
+              </RequireAuth>
+            }
+          />
 
-<Route
-  path="/change-username"
-  element={
-    <RequireAuth>
-      <ChangeUsername />
-    </RequireAuth>
-  }
-/>
+          <Route
+            path="/change-username"
+            element={
+              <RequireAuth>
+                <ChangeUsername />
+              </RequireAuth>
+            }
+          />
         </Routes>
       </main>
+      
+      {/* Bottom Navigation for mobile */}
+      <BottomNav />
     </div>
   )
 }

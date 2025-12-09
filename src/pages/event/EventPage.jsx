@@ -163,12 +163,18 @@ export default function EventPage() {
     
     try {
       const ref = doc(db, "events", event.id);
+      const existingResponse = responses[user.uid];
+      const existingUpdatedAt = typeof existingResponse === 'object' ? existingResponse.updatedAt : null;
+      
       const newResponses = { 
         ...responses, 
         [user.uid]: newStatus === null ? null : {
           status: newStatus,
           preferences: preferences,
-          updatedAt: new Date().toISOString(),
+          // Preserve original RSVP time if updating, otherwise use current time
+          updatedAt: existingUpdatedAt && existingResponse?.status === 'available' 
+            ? existingUpdatedAt 
+            : new Date().toISOString(),
         }
       };
       await updateDoc(ref, { responses: newResponses });
@@ -289,13 +295,23 @@ export default function EventPage() {
     
     const date = event.date?.toDate ? event.date.toDate() : null;
     const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
-    const eventUrl = window.location.href;
+    
+    // Build correct URL for GitHub Pages
+    const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : '');
+    const eventUrl = `${baseUrl}/event/${event.id}`;
+    
+    // Get player names for confirmed players
+    const playerNames = confirmedIds
+      .map(uid => getUserName(uid).toLowerCase())
+      .join(', ');
 
-    let msg = `⛳ *${event.title || "Golf round"}*\n`;
+    // Build message in new format
+    let msg = `⛳ Golf - ${event.booked ? "Booked" : "Proposed"}!\n`;
     if (dateStr) msg += `📅 ${dateStr}\n`;
     if (event.tee) msg += `🕒 ${event.tee}\n`;
     if (event.courseName) msg += `📍 ${event.courseName}\n`;
-    msg += `\n🔗 ${eventUrl}`;
+    if (playerNames) msg += `🏌️ ${playerNames}\n`;
+    msg += `🔗 RSVP here: ${eventUrl}`;
 
     try {
       await navigator.clipboard.writeText(msg);
@@ -339,11 +355,14 @@ export default function EventPage() {
     return response.preferences || {};
   };
 
+  // FIX: Sort by updatedAt (ISO string) instead of non-existent rsvpAt
   const allAttendingIds = Object.entries(responses)
     .filter(([_, response]) => getResponseStatus(response) === "available")
     .sort(([, a], [, b]) => {
-      const aTime = a?.rsvpAt?.toMillis?.() || 0;
-      const bTime = b?.rsvpAt?.toMillis?.() || 0;
+      // Handle both old string format and new object format
+      // New format uses updatedAt (ISO string), fall back to 0 for legacy entries
+      const aTime = typeof a === 'object' && a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const bTime = typeof b === 'object' && b?.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return aTime - bTime; // earliest RSVP first
     })
     .map(([uid]) => uid);
