@@ -19,6 +19,9 @@ import GolfConditions from "../../components/GolfConditions";
 import RSVPPreferencesModal from "../../components/RSVPPreferencesModal";
 import { triggerConfetti, showToast, hapticFeedback } from "../../utils/uiEffects";
 import { getInitials, getAvatarStyle } from "../../utils/avatarUtils";
+import CalendarMenu from "../../components/CalendarMenu";
+
+
 
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
@@ -699,14 +702,10 @@ export default function EventPage() {
                 <div style={{ fontWeight: 500 }}>RSVPs closed</div>
                 <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>This round is booked</div>
               </div>
-              {isUserConfirmed && (
-                <button 
-                  className="btn btn-primary btn-sm hover-lift press-effect"
-                  style={{ marginLeft: "auto" }}
-                  onClick={() => window.open(buildGoogleCalendarUrl(event, window.location.href), "_blank")}
-                >
-                  📅 Add to Calendar
-                </button>
+               {isUserConfirmed && (
+                <div style={{ marginLeft: "auto" }}>
+                  <CalendarMenu event={event} />
+                </div>
               )}
             </div>
           ) : (
