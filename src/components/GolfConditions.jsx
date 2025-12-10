@@ -63,7 +63,7 @@ export default function GolfConditions({ placeId, date, tee }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false); // Collapsed by default
 
   // Format the event date for display
   const eventDateStr = date?.toDate 
@@ -114,11 +114,11 @@ export default function GolfConditions({ placeId, date, tee }) {
   if (!placeId) return null;
 
   const containerStyle = {
-    padding: "14px 16px",
+    padding: expanded ? "14px 16px" : "10px 14px",
     background: "var(--color-bg-secondary)",
     borderRadius: "var(--radius-lg)",
     cursor: "pointer",
-    transition: "background 0.15s ease",
+    transition: "all 0.2s ease",
   };
 
   if (loading) {
@@ -163,88 +163,113 @@ export default function GolfConditions({ placeId, date, tee }) {
       style={containerStyle}
       onClick={() => setExpanded(!expanded)}
     >
-      {/* Header */}
-      <div style={{ 
-        fontSize: 11, 
-        color: "var(--color-text-tertiary)", 
-        marginBottom: 8,
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        fontWeight: 500,
-      }}>
-        Weather {eventDateStr && `• ${eventDateStr}`} {tee && `@ ${tee}`}
-      </div>
-
-      {/* Summary */}
-      <div style={{ 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "space-between",
-        gap: 12,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 24 }}>{icon}</span>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text)" }}>
+      {/* Collapsed view - single line */}
+      {!expanded ? (
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>{icon}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text)" }}>
               {label}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-              {temp}°C • {wind} km/h wind • {rain}% rain
-            </div>
+            </span>
+            <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+              • {temp}°C • {wind} km/h • {rain}% rain
+            </span>
           </div>
+          <span style={{ 
+            fontSize: 12, 
+            color: "var(--color-text-tertiary)",
+          }}>
+            ▼
+          </span>
         </div>
-        <span style={{ 
-          fontSize: 12, 
-          color: "var(--color-text-tertiary)",
-          transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-          transition: "transform 0.2s ease",
-        }}>
-          ▼
-        </span>
-      </div>
+      ) : (
+        <>
+          {/* Expanded view - full details */}
+          {/* Header */}
+          <div style={{ 
+            fontSize: 11, 
+            color: "var(--color-text-tertiary)", 
+            marginBottom: 8,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            fontWeight: 500,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <span>Weather {eventDateStr && `• ${eventDateStr}`} {tee && `@ ${tee}`}</span>
+            <span style={{ 
+              fontSize: 12, 
+              transform: "rotate(180deg)",
+              transition: "transform 0.2s ease",
+            }}>
+              ▼
+            </span>
+          </div>
 
-      {/* Warnings */}
-      {warnings.length > 0 && (
-        <div style={{ 
-          fontSize: 12, 
-          color: "var(--color-danger)", 
-          marginTop: 8,
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-        }}>
-          ⚠️ {warnings.join(", ")}
-        </div>
-      )}
+          {/* Summary */}
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 10,
+          }}>
+            <span style={{ fontSize: 24 }}>{icon}</span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text)" }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                {temp}°C • {wind} km/h wind • {rain}% rain
+              </div>
+            </div>
+          </div>
 
-      {/* Expanded details */}
-      {expanded && (
-        <div style={{ 
-          marginTop: 12, 
-          paddingTop: 12, 
-          borderTop: "1px solid var(--color-border)",
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "10px 20px",
-          fontSize: 13,
-        }}>
-          <div>
-            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Temperature</div>
-            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{temp}°C</div>
+          {/* Warnings */}
+          {warnings.length > 0 && (
+            <div style={{ 
+              fontSize: 12, 
+              color: "var(--color-danger)", 
+              marginTop: 8,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}>
+              ⚠️ {warnings.join(", ")}
+            </div>
+          )}
+
+          {/* Detailed grid */}
+          <div style={{ 
+            marginTop: 12, 
+            paddingTop: 12, 
+            borderTop: "1px solid var(--color-border)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "10px 20px",
+            fontSize: 13,
+          }}>
+            <div>
+              <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Temperature</div>
+              <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{temp}°C</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Rain chance</div>
+              <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{rain}%</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Wind</div>
+              <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{wind} km/h</div>
+            </div>
+            <div>
+              <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Cloud cover</div>
+              <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{cloud}%</div>
+            </div>
           </div>
-          <div>
-            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Rain chance</div>
-            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{rain}%</div>
-          </div>
-          <div>
-            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Wind</div>
-            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{wind} km/h</div>
-          </div>
-          <div>
-            <div style={{ color: "var(--color-text-tertiary)", fontSize: 11, marginBottom: 2 }}>Cloud cover</div>
-            <div style={{ fontWeight: 500, color: "var(--color-text)" }}>{cloud}%</div>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

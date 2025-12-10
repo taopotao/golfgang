@@ -854,12 +854,14 @@ small, .text-sm {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
+  padding: 6px 12px;
   border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
+  /* Add shadow for better visibility on any background */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .status-badge--dot {
@@ -875,14 +877,16 @@ small, .text-sm {
   50% { opacity: 0.5; }
 }
 
+/* Proposed - solid blue background */
 .status-badge--proposed {
-  background: var(--color-info-soft);
-  color: var(--color-info);
+  background: #2563eb;
+  color: #ffffff;
 }
 
+/* Booked - solid green background */
 .status-badge--booked {
-  background: var(--color-success-soft);
-  color: var(--color-success);
+  background: #059669;
+  color: #ffffff;
 }
 
 /* ---------- Buttons ---------- */

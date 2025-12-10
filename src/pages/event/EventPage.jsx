@@ -692,24 +692,50 @@ export default function EventPage() {
         </div>
       </div>
 
-      {/* RSVP CARD */}
+      {/* RSVP / STATUS SECTION */}
       {!editing && (
-        <div className="card rsvp-card">
-          {event.booked ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 20 }}>🔒</span>
-              <div>
-                <div style={{ fontWeight: 500 }}>RSVPs closed</div>
-                <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>This round is booked</div>
+        <>
+          {/* BOOKED + CONFIRMED: Compact confirmation bar */}
+          {event.booked && isUserConfirmed && (
+            <div style={{
+              padding: "14px 16px",
+              borderRadius: 12,
+              background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+              border: "2px solid #10b981",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              animation: "fade-up 0.3s ease-out",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>✓</span>
+                <span style={{ fontWeight: 600, fontSize: 15, color: "#065f46" }}>
+                  You're confirmed for this round
+                </span>
               </div>
-               {isUserConfirmed && (
-                <div style={{ marginLeft: "auto" }}>
-                  <CalendarMenu event={event} />
-                </div>
-              )}
+              <CalendarMenu event={event} />
             </div>
-          ) : (
-            <>
+          )}
+
+          {/* BOOKED + NOT CONFIRMED: Just show locked */}
+          {event.booked && !isUserConfirmed && (
+            <div className="card rsvp-card">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>🔒</span>
+                <div>
+                  <div style={{ fontWeight: 500 }}>RSVPs closed</div>
+                  <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                    This round is booked
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* NOT BOOKED: Show RSVP buttons */}
+          {!event.booked && (
+            <div className="card rsvp-card">
               <div style={{ marginBottom: 12, fontWeight: 500 }}>Are you in?</div>
               {confirmedIds.length >= MAX_PLAYERS && !myStatus && (
                 <div style={{ 
@@ -728,10 +754,8 @@ export default function EventPage() {
                   className={`rsvp-btn rsvp-btn--available ${myStatus === "available" ? "active" : ""}`}
                   onClick={() => {
                     if (myStatus === "available") {
-                      // Already in - clicking again removes response
                       updateResponse(null);
                     } else {
-                      // Not in yet - show preferences modal
                       setShowRSVPModal(true);
                     }
                   }}
@@ -747,52 +771,51 @@ export default function EventPage() {
                   {savingResponse && myStatus === "unavailable" ? "..." : "✗ Can't make it"}
                 </button>
               </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Your status banner */}
-      {myStatus && !editing && (
-        <div style={{
-          padding: "12px 16px",
-          borderRadius: 8,
-          background: myStatus === "available" 
-            ? isUserReserve ? "var(--color-warning-soft)" : "var(--color-success-soft)"
-            : "var(--color-bg-secondary)",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          animation: "fade-up 0.3s ease-out",
-        }}>
-          <span style={{ fontSize: 18 }}>
-            {myStatus === "available" ? (isUserReserve ? "🔔" : "✓") : "✗"}
-          </span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 500, fontSize: 14 }}>
-              {myStatus === "available" 
-                ? isUserReserve ? "You're on the reserve list" : "You're in!"
-                : "You declined"}
             </div>
-            {isUserReserve && (
-              <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                Position {reserveIds.indexOf(user.uid) + 1} in queue
-              </div>
-            )}
-          </div>
-          {/* Edit preferences button - only show if attending and event not booked */}
-          {myStatus === "available" && !event.booked && (
-            <button 
-              className="btn btn-ghost btn-sm press-effect"
-              onClick={() => setShowRSVPModal(true)}
-              style={{ fontSize: 12 }}
-            >
-              Edit preferences
-            </button>
           )}
-        </div>
-      )}
 
+          {/* STATUS BANNER - Only show when NOT booked (for booked events, we show the compact bar above) */}
+          {myStatus && !event.booked && (
+            <div style={{
+              padding: "12px 16px",
+              borderRadius: 8,
+              background: myStatus === "available" 
+                ? isUserReserve ? "var(--color-warning-soft)" : "var(--color-success-soft)"
+                : "var(--color-bg-secondary)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              animation: "fade-up 0.3s ease-out",
+            }}>
+              <span style={{ fontSize: 18 }}>
+                {myStatus === "available" ? (isUserReserve ? "🔔" : "✓") : "✗"}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 500, fontSize: 14 }}>
+                  {myStatus === "available" 
+                    ? isUserReserve ? "You're on the reserve list" : "You're in!"
+                    : "You declined"}
+                </div>
+                {isUserReserve && (
+                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                    Position {reserveIds.indexOf(user.uid) + 1} in queue
+                  </div>
+                )}
+              </div>
+              {myStatus === "available" && !event.booked && (
+                <button 
+                  className="btn btn-ghost btn-sm press-effect"
+                  onClick={() => setShowRSVPModal(true)}
+                  style={{ fontSize: 12 }}
+                >
+                  Edit preferences
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+      
       {/* RSVP Preferences Modal */}
       <RSVPPreferencesModal
         isOpen={showRSVPModal}
