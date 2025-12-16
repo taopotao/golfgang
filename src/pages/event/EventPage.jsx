@@ -344,39 +344,12 @@ async function shareToClipboard() {
     msg += `\n📝 ${event.notes}\n`;
   }
   
-  // Try to shorten URLs using is.gd (no preview/redirect page)
-  let shortEventUrl = eventUrl;
-  let shortCalUrl = null;
-  
-  try {
-    // Shorten event URL
-    const eventResponse = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(eventUrl)}`);
-    if (eventResponse.ok) {
-      shortEventUrl = await eventResponse.text();
-    }
-    
-    // Shorten calendar URL if booked
-    if (event.booked) {
-      const calUrl = buildGoogleCalendarUrl(event, eventUrl);
-      const calResponse = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(calUrl)}`);
-      if (calResponse.ok) {
-        shortCalUrl = await calResponse.text();
-      } else {
-        shortCalUrl = calUrl;
-      }
-    }
-  } catch (err) {
-    console.warn("Could not shorten URLs, using full URLs", err);
-    if (event.booked) {
-      shortCalUrl = buildGoogleCalendarUrl(event, eventUrl);
-    }
-  }
-  
-  msg += `\n🔗 Event details: ${shortEventUrl}`;
+  msg += `\n🔗 Event details:\n${eventUrl}`;
 
-  // Add calendar link for booked events
-  if (event.booked && shortCalUrl) {
-    msg += `\n\n📅 Add to Google Calendar:\n${shortCalUrl}`;
+  // Add Google Calendar link for booked events
+  if (event.booked) {
+    const calUrl = buildGoogleCalendarUrl(event, eventUrl);
+    msg += `\n\n📅 Add to Google Calendar:\n${calUrl}`;
   }
 
   try {
