@@ -22,7 +22,6 @@ import { getInitials, getAvatarStyle } from "../../utils/avatarUtils";
 import CalendarMenu from "../../components/CalendarMenu";
 
 
-
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
   if (!event) return "";
@@ -89,6 +88,7 @@ export default function EventPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
   const [form, setForm] = useState({
     title: "",
     notes: "",
@@ -279,51 +279,110 @@ export default function EventPage() {
     }
   }
 
-  async function deleteEvent() {
-    if (!event || !window.confirm("Delete this event?")) return;
-    hapticFeedback('heavy');
+    async function deleteEvent() {
+      if (!event || !window.confirm("Delete this event?")) return;
+      hapticFeedback('heavy');
+      
+      try {
+        await deleteDoc(doc(db, "events", event.id));
+        showToast("Event deleted", 'default');
+        navigate("/");
+      } catch (err) {
+        console.error("Error deleting event", err);
+        showToast("Failed to delete", 'error');
+      }
+    }
+
+const addPlayer = async (uid) => {
+  if (!event || !uid) return;
+  hapticFeedback('light');
+  
+  try {
+    const ref = doc(db, "events", event.id);
+    const newResponses = {
+      ...responses,
+      [uid]: {
+        status: "available",
+        preferences: {},
+        updatedAt: new Date().toISOString(),
+      }
+    };
+    await updateDoc(ref, { responses: newResponses });
+    setResponses(newResponses);
+    showToast("Player added ✓", 'success');
+  } catch (err) {
+    console.error("Error adding player", err);
+    showToast("Failed to add player", 'error');
+  }
+};
     
+async function shareToClipboard() {
+  if (!event) return;
+  hapticFeedback('light');
+  
+  const date = event.date?.toDate ? event.date.toDate() : null;
+  const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
+  
+  // Build correct URL for GitHub Pages
+  const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : '');
+  const eventUrl = `${baseUrl}/event/${event.id}`;
+  
+  // Get player names for confirmed players
+  const playerNames = confirmedIds
+    .map(uid => getUserName(uid).toLowerCase())
+    .join(', ');
+
+  // Build message
+  let msg = `⛳ Golf - ${event.booked ? "Booked" : "Proposed"}!\n`;
+  if (dateStr) msg += `📅 ${dateStr}\n`;
+  if (event.tee) msg += `🕒 ${event.tee}\n`;
+  if (event.courseName) msg += `📍 ${event.courseName}\n`;
+  if (playerNames) msg += `🏌️ ${playerNames}\n`;
+  
+  // Add notes if present
+  if (event.notes) {
+    msg += `\n📝 ${event.notes}\n`;
+  }
+  
+  // Try to shorten the event URL using TinyURL
+  let shortEventUrl = eventUrl;
+  try {
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(eventUrl)}`);
+    if (response.ok) {
+      shortEventUrl = await response.text();
+    }
+  } catch (err) {
+    console.warn("Could not shorten event URL, using full URL", err);
+  }
+  
+  msg += `\n🔗 Event details: ${shortEventUrl}`;
+
+  // Add shortened Google Calendar link for booked events
+  if (event.booked) {
+    const calUrl = buildGoogleCalendarUrl(event, eventUrl);
+    
+    // Try to shorten the URL using TinyURL
+    let shortCalUrl = calUrl;
     try {
-      await deleteDoc(doc(db, "events", event.id));
-      showToast("Event deleted", 'default');
-      navigate("/");
+      const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(calUrl)}`);
+      if (response.ok) {
+        shortCalUrl = await response.text();
+      }
     } catch (err) {
-      console.error("Error deleting event", err);
-      showToast("Failed to delete", 'error');
+      console.warn("Could not shorten calendar URL, using full URL", err);
     }
+    
+    msg += `\n\n📅 Add to Google Calendar:\n${shortCalUrl}`;
   }
 
-  async function shareToClipboard() {
-    if (!event) return;
-    hapticFeedback('light');
-    
-    const date = event.date?.toDate ? event.date.toDate() : null;
-    const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
-    
-    // Build correct URL for GitHub Pages
-    const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : '');
-    const eventUrl = `${baseUrl}/event/${event.id}`;
-    
-    // Get player names for confirmed players
-    const playerNames = confirmedIds
-      .map(uid => getUserName(uid).toLowerCase())
-      .join(', ');
-
-    // Build message in new format
-    let msg = `⛳ Golf - ${event.booked ? "Booked" : "Proposed"}!\n`;
-    if (dateStr) msg += `📅 ${dateStr}\n`;
-    if (event.tee) msg += `🕒 ${event.tee}\n`;
-    if (event.courseName) msg += `📍 ${event.courseName}\n`;
-    if (playerNames) msg += `🏌️ ${playerNames}\n`;
-    msg += `🔗 RSVP here: ${eventUrl}`;
-
-    try {
-      await navigator.clipboard.writeText(msg);
-      showToast("Copied to clipboard! 📋", 'success');
-    } catch {
-      showToast("Could not copy", 'error');
-    }
+  try {
+    await navigator.clipboard.writeText(msg);
+    showToast("Copied to clipboard! 📋", 'success');
+  } catch {
+    showToast("Could not copy", 'error');
   }
+}
+
 
   if (loadingEvent || loadingUsers) {
     return (
@@ -827,9 +886,20 @@ export default function EventPage() {
       {/* PLAYERS CARD */}
       <div className="card">
         <div className="section-header">
-          <span className="section-title">Players</span>
-          <span className="section-count">{confirmedIds.length}/{MAX_PLAYERS}</span>
-        </div>
+  <span className="section-title">Playing</span>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span className="section-count">{confirmedIds.length}/{MAX_PLAYERS}</span>
+    {isAdmin && !event.booked && (
+      <button 
+        className="btn btn-ghost btn-sm press-effect"
+        onClick={() => setShowAddPlayerModal(true)}
+        style={{ padding: "4px 8px", fontSize: 12 }}
+      >
+        + Add
+      </button>
+    )}
+  </div>
+</div>
 
         {confirmedIds.length === 0 ? (
           <div className="empty-state" style={{ padding: "24px 0" }}>
@@ -1142,6 +1212,98 @@ export default function EventPage() {
             </>
           )}
       </div>
+      {/* Add Player Modal - INLINE */}
+{showAddPlayerModal && (
+  <div 
+    className="modal-backdrop" 
+    onClick={(e) => {
+      if (e.target === e.currentTarget) setShowAddPlayerModal(false);
+    }}
+  >
+    <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, marginBottom: 4 }}>Add Player</h2>
+        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>
+          Select a player to add to the RSVP list
+        </p>
+      </div>
+
+      <div style={{ 
+        maxHeight: 300, 
+        overflowY: "auto",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        marginBottom: 16,
+      }}>
+        {allUsers
+          .filter(u => {
+            const response = responses[u.id];
+            const status = typeof response === 'object' ? response?.status : response;
+            return status !== "available";
+          })
+          .map(u => {
+            const name = u.username || u.email?.split("@")[0] || "Unknown";
+            return (
+              <div
+                key={u.id}
+                onClick={async () => {
+                  await addPlayer(u.id);
+                  setShowAddPlayerModal(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 14px",
+                  cursor: "pointer",
+                  borderBottom: "1px solid var(--color-border)",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-bg-hover, #f3f4f6)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <div style={getAvatarStyle(name, 32)}>
+                  {getInitials(name)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500, fontSize: 14 }}>{name}</div>
+                  {u.email && u.username && (
+                    <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>
+                      {u.email}
+                    </div>
+                  )}
+                </div>
+                <span style={{ color: "var(--color-primary)", fontSize: 14 }}>+ Add</span>
+              </div>
+            );
+          })}
+        {allUsers.filter(u => {
+          const response = responses[u.id];
+          const status = typeof response === 'object' ? response?.status : response;
+          return status !== "available";
+        }).length === 0 && (
+          <div style={{ 
+            padding: 20, 
+            textAlign: "center", 
+            color: "var(--color-text-secondary)",
+            fontSize: 14,
+          }}>
+            All players have already RSVP'd
+          </div>
+        )}
+      </div>
+
+      <button 
+        className="btn btn-ghost press-effect"
+        onClick={() => setShowAddPlayerModal(false)}
+        style={{ width: "100%" }}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

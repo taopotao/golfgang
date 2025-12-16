@@ -3,6 +3,40 @@
 import { toJsDate } from "../../utils/dateUtils";
 
 /**
+ * Build Google Calendar URL for an event
+ */
+function buildGoogleCalendarUrl(event, eventUrl) {
+  const date = event.date?.toDate ? event.date.toDate() : new Date();
+  const teeTime = event.tee || "";
+  const courseName = event.courseName || "";
+  const notes = event.notes || "";
+
+  let startDateTime = new Date(date);
+  if (teeTime) {
+    const [h, m] = teeTime.split(":").map((x) => parseInt(x, 10));
+    if (!Number.isNaN(h)) startDateTime.setHours(h);
+    if (!Number.isNaN(m)) startDateTime.setMinutes(m);
+  }
+
+  const endDateTime = new Date(startDateTime.getTime() + 4.5 * 60 * 60 * 1000);
+
+  const toGoogleDateTime = (d) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+  };
+
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `⛳ ${teeTime || "Golf"} - ${courseName || "Golf Round"}`,
+    dates: `${toGoogleDateTime(startDateTime)}/${toGoogleDateTime(endDateTime)}`,
+    details: notes ? `${notes}\n\nEvent: ${eventUrl}` : `Event: ${eventUrl}`,
+    location: courseName,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/**
  * Share an event to WhatsApp, using the poster image created by createSharePoster.
  *
  * @param {Object} event       The event document
@@ -35,7 +69,18 @@ export default async function shareViaWhatsApp(event, responses, imageDataUrl) {
       msg += "🟦 *RSVPs open*\n";
     }
 
+    // Add notes if present
+    if (event.notes) {
+      msg += `\n📝 ${event.notes}\n`;
+    }
+
     msg += `\n🔗 Event details:\n${url}`;
+
+    // Add Google Calendar link for booked events
+    if (event.booked) {
+      const calUrl = buildGoogleCalendarUrl(event, url);
+      msg += `\n\n📅 Add to Google Calendar:\n${calUrl}`;
+    }
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
