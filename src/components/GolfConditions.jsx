@@ -173,11 +173,21 @@ export default function GolfConditions({ placeId, date, tee }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 18 }}>{icon}</span>
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text)" }}>
-              {label}
-            </span>
-            <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-              • {temp}°C • {wind} km/h • {rain}% rain
-            </span>
+  {label}
+</span>
+<span style={{ 
+  fontSize: 12, 
+  fontWeight: 600,
+  color: cleanScore >= 8 ? "#16a34a" : cleanScore >= 6 ? "#ca8a04" : "#dc2626",
+  background: cleanScore >= 8 ? "#dcfce7" : cleanScore >= 6 ? "#fef9c3" : "#fee2e2",
+  padding: "2px 6px",
+  borderRadius: 4,
+}}>
+  {cleanScore.toFixed(1)}
+</span>
+<span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+  • {temp}°C • {wind} km/h • {rain}% rain
+</span>
           </div>
           <span style={{ 
             fontSize: 12, 
@@ -219,13 +229,25 @@ export default function GolfConditions({ placeId, date, tee }) {
           }}>
             <span style={{ fontSize: 24 }}>{icon}</span>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text)" }}>
-                {label}
-              </div>
-              <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-                {temp}°C • {wind} km/h wind • {rain}% rain
-              </div>
-            </div>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text)" }}>
+      {label}
+    </span>
+    <span style={{ 
+      fontSize: 12, 
+      fontWeight: 600,
+      color: cleanScore >= 8 ? "#16a34a" : cleanScore >= 6 ? "#ca8a04" : "#dc2626",
+      background: cleanScore >= 8 ? "#dcfce7" : cleanScore >= 6 ? "#fef9c3" : "#fee2e2",
+      padding: "2px 6px",
+      borderRadius: 4,
+    }}>
+      {cleanScore.toFixed(1)}
+    </span>
+  </div>
+  <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+    {temp}°C • {wind} km/h wind • {rain}% rain
+  </div>
+</div>
           </div>
 
           {/* Warnings */}

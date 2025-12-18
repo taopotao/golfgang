@@ -94,20 +94,49 @@ export default function CourseAutocomplete({ onSelect, initialValue = "" }) {
   }, [onSelect]);
 
   return (
-    <>
-      <input
-        ref={inputRef}
-        className="input"
-        style={{ width: "100%" }}
-        placeholder="Search golf course"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
-      {error && (
-        <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 4 }}>
-          {error}
-        </p>
-      )}
-    </>
-  );
+  <div style={{ position: "relative" }}>
+    <input
+      ref={inputRef}
+      className="input"
+      style={{ width: "100%", paddingRight: value ? 32 : undefined }}
+      placeholder="Search golf course"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+    />
+    {value && (
+      <button
+        type="button"
+        onClick={() => {
+          setValue("");
+          onSelect?.({
+            name: "",
+            address: "",
+            placeId: "",
+            photoUrl: "",
+          });
+        }}
+        style={{
+          position: "absolute",
+          right: 8,
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontSize: 16,
+          color: "var(--color-text-tertiary)",
+          padding: 4,
+        }}
+        aria-label="Clear course"
+      >
+        ✕
+      </button>
+    )}
+    {error && (
+      <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 4 }}>
+        {error}
+      </p>
+    )}
+  </div>
+);
 }
