@@ -12,8 +12,7 @@ import ResetPassword from "./pages/ResetPassword";
 import ChangeUsername from "./pages/ChangeUsername";
 import Profile from "./pages/Profile";
 import Signup from "./pages/Signup";
-import Polls from "./pages/Polls";
-import AdminSettings from "./pages/AdminSettings";
+
 
 export default function App() {
   return (
@@ -81,7 +80,6 @@ export default function App() {
               </RequireAuth>
             }
           />
-<Route path="/admin/settings" element={<AdminSettings />} />
         </Routes>
       </main>
       

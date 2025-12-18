@@ -34,6 +34,7 @@ export default function Admin() {
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [polls, setPolls] = useState([]);
+  const [weekdayProposals, setWeekdayProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Favourite courses
@@ -69,6 +70,10 @@ export default function Admin() {
       const pollSnap = await getDocs(collection(db, "polls"));
       const pollList = pollSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
+      // Load weekday proposals
+      const proposalsSnap = await getDocs(collection(db, "weekdayProposals"));
+      const proposalList = proposalsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
       // Load settings
       const settingsDoc = await getDoc(doc(db, "settings", "general"));
       if (settingsDoc.exists()) {
@@ -78,6 +83,7 @@ export default function Admin() {
       setEvents(eventList);
       setUsers(userList);
       setPolls(pollList);
+      setWeekdayProposals(proposalList);
       setLoading(false);
     }
     load();
@@ -87,6 +93,7 @@ export default function Admin() {
     if (!confirm("Delete this event?")) return;
     await deleteDoc(doc(db, "events", id));
     setEvents((prev) => prev.filter((e) => e.id !== id));
+    showToast("Event deleted");
   };
 
   const toggleAdmin = async (uid, isAdmin) => {
@@ -102,6 +109,14 @@ export default function Admin() {
     await deleteDoc(doc(db, "polls", id));
     setPolls((prev) => prev.filter((p) => p.id !== id));
     showToast("Poll deleted");
+  };
+
+  // Delete weekday proposal
+  const deleteWeekdayProposal = async (id) => {
+    if (!confirm("Delete this weekday proposal?")) return;
+    await deleteDoc(doc(db, "weekdayProposals", id));
+    setWeekdayProposals((prev) => prev.filter((p) => p.id !== id));
+    showToast("Proposal deleted");
   };
 
   // Favourite courses handlers
@@ -292,7 +307,7 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* POLLS */}
+      {/* WEEKEND POLLS */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="section-header">
           <span className="section-title">🗳️ Weekend Polls</span>
@@ -392,6 +407,61 @@ export default function Admin() {
         )}
       </div>
 
+      {/* WEEKDAY PROPOSALS */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="section-header">
+          <span className="section-title">📅 Weekday Proposals</span>
+          <span className="section-count">{weekdayProposals.length}</span>
+        </div>
+
+        {weekdayProposals.length === 0 ? (
+          <p style={{ color: "var(--color-text-secondary)", padding: "12px 0" }}>
+            No weekday proposals yet
+          </p>
+        ) : (
+          weekdayProposals
+            .sort((a, b) => (b.date?.toMillis() || 0) - (a.date?.toMillis() || 0))
+            .map((proposal, idx) => {
+              const proposalDate = proposal.date?.toDate?.();
+              const voteCount = Object.keys(proposal.votes || {}).length;
+              const isConverted = proposal.status === "converted";
+              const proposerName = users.find(u => u.id === proposal.proposedBy)?.username || 
+                                   proposal.proposedByName || "Someone";
+
+              return (
+                <div
+                  key={proposal.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 0",
+                    borderBottom: idx < weekdayProposals.length - 1 ? "1px solid var(--color-divider)" : "none",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 500, marginBottom: 2 }}>
+                      {proposalDate?.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
+                      {proposal.tee && ` @ ${proposal.tee}`}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                      {proposal.courseName || "Course TBD"} • {voteCount} votes • by {proposerName}
+                      {isConverted && " • ✓ Event Created"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deleteWeekdayProposal(proposal.id)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: "var(--color-danger)" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              );
+            })
+        )}
+      </div>
+
       {/* EVENTS */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="section-header">
@@ -405,13 +475,12 @@ export default function Admin() {
           </p>
         ) : (
           events.map((ev, idx) => {
-            const dateString = ev.date?.toDate?.().toLocaleString("en-AU", {
+            const dateString = ev.date?.toDate?.()?.toLocaleDateString("en-AU", {
               weekday: "short",
-              month: "short",
               day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
+              month: "short",
             });
+            const timeString = ev.tee || "";
 
             return (
               <div
@@ -422,43 +491,36 @@ export default function Admin() {
                   alignItems: "center",
                   padding: "12px 0",
                   borderBottom: idx < events.length - 1 ? "1px solid var(--color-divider)" : "none",
-                  gap: 12,
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontWeight: 500 }}>{ev.title}</span>
-                    <span style={{
-                      padding: '3px 8px',
-                      borderRadius: 6,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      ...(ev.booked ? {
+                    <span style={{ fontWeight: 500 }}>{ev.title || "Golf"}</span>
+                    {ev.booked && (
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 20,
                         background: colors.booked.badge,
                         color: colors.booked.badgeText,
-                      } : {
-                        background: colors.proposed.badge,
-                        color: colors.proposed.badgeText,
-                        border: `1px solid ${colors.proposed.badgeBorder}`,
-                      })
-                    }}>
-                      {ev.booked ? "Booked" : "Proposed"}
-                    </span>
+                      }}>
+                        BOOKED
+                      </span>
+                    )}
                   </div>
-                  <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-                    {dateString}
-                  </span>
+                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                    {dateString}{timeString && `, ${timeString}`}
+                  </div>
                 </div>
-
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <div style={{ display: "flex", gap: 8 }}>
                   <Link to={`/event/${ev.id}`} className="btn btn-ghost btn-sm">
                     Open
                   </Link>
-                  <button 
-                    className="btn btn-ghost btn-sm" 
-                    style={{ color: "var(--color-danger)" }} 
+                  <button
                     onClick={() => deleteEvent(ev.id)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: "var(--color-danger)" }}
                   >
                     Delete
                   </button>
@@ -477,7 +539,7 @@ export default function Admin() {
         </div>
 
         {users.map((u, idx) => {
-          const displayName = u.username || u.email || "?";
+          const displayName = u.username || u.email?.split("@")[0] || "User";
           const avatarColors = getAvatarColor(displayName);
 
           return (

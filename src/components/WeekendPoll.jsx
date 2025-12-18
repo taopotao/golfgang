@@ -92,6 +92,29 @@ export default function WeekendPoll({ poll, onVoteSubmit, allUsers = [] }) {
     return u?.username || u?.email?.split("@")[0] || "User";
   };
 
+  // Calculate tallies for preferences summary
+  const tallies = {
+    day: { saturday: 0, sunday: 0, either: 0 },
+    time: { am: 0, pm: 0, either: 0 },
+    transport: { cart: 0, walk: 0, either: 0 },
+    format: { scramble: 0, stroke: 0, either: 0 },
+    course: {},
+  };
+
+  Object.values(poll?.votes || {}).forEach((vote) => {
+    if (vote.day) tallies.day[vote.day]++;
+    if (vote.time) tallies.time[vote.time]++;
+    if (vote.transport) tallies.transport[vote.transport]++;
+    if (vote.format) tallies.format[vote.format]++;
+    if (vote.course) {
+      tallies.course[vote.course] = (tallies.course[vote.course] || 0) + 1;
+    }
+  });
+
+  // Get top course
+  const topCourse = Object.entries(tallies.course)
+    .sort((a, b) => b[1] - a[1])[0];
+
   const handleVoteChange = (category, value) => {
     if (isPollClosed) return;
     hapticFeedback("light");
@@ -156,6 +179,13 @@ export default function WeekendPoll({ poll, onVoteSubmit, allUsers = [] }) {
     return `${satDate.toLocaleDateString("en-AU", { day: "numeric" })}-${sunDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`;
   };
 
+  // Get individual voter's preferences
+  const getVoterPrefs = (uid) => {
+    const vote = poll?.votes?.[uid];
+    if (!vote) return null;
+    return vote;
+  };
+
   return (
     <div 
       style={{ 
@@ -174,125 +204,141 @@ export default function WeekendPoll({ poll, onVoteSubmit, allUsers = [] }) {
         display: "flex", 
         justifyContent: "space-between", 
         alignItems: "flex-start",
-        marginBottom: expanded ? 16 : 0,
       }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flex: 1 }}>
           <div style={{
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             borderRadius: 12,
             background: "white",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 22,
+            fontSize: 24,
             boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            flexShrink: 0,
           }}>
             🗳️
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#854d0e", marginBottom: 2 }}>
-              Weekend Poll
+            <div style={{ fontWeight: 700, fontSize: 17, color: "#854d0e", marginBottom: 4 }}>
+              Who's in for {formatWeekendDate()}?
             </div>
-            <div style={{ fontSize: 14, color: "#a16207", fontWeight: 500 }}>
-              {formatWeekendDate()}
-            </div>
+            {expanded && (
+              <div style={{ fontSize: 13, color: "#a16207" }}>
+                Pick your day, time & course
+              </div>
+            )}
           </div>
         </div>
         
-        <div style={{ textAlign: "right" }}>
-          {!expanded && (
-            <div style={{ 
-              fontSize: 12, 
-              color: "#a16207",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 2,
-            }}>
-              <CountdownTimer deadline={poll?.deadline?.toDate()} compact />
-              <span>{totalVoters} voted {hasVoted && "• ✓"}</span>
-            </div>
-          )}
-          {expanded && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: "none",
-                background: "white",
-                cursor: "pointer",
-                fontSize: 12,
-                color: "#854d0e",
-                fontWeight: 500,
-              }}
-            >
-              Close ▲
-            </button>
-          )}
-        </div>
+        {expanded && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "none",
+              background: "white",
+              cursor: "pointer",
+              fontSize: 13,
+              color: "#854d0e",
+              fontWeight: 500,
+              flexShrink: 0,
+            }}
+          >
+            ✕ Close
+          </button>
+        )}
       </div>
 
-      {/* Collapsed: show responders */}
-      {!expanded && totalVoters > 0 && (
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          gap: 6, 
-          marginTop: 12,
-          paddingTop: 12,
-          borderTop: "1px solid #fde047",
-        }}>
-          <span style={{ fontSize: 12, color: "#a16207", marginRight: 4 }}>Responses:</span>
-          {voterIds.slice(0, 5).map((uid, idx) => {
-            const name = getVoterName(uid);
-            return (
-              <div
-                key={uid}
-                title={name}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  ...getAvatarStyle(name, 28),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  border: "2px solid #fef9c3",
-                  marginLeft: idx > 0 ? -6 : 0,
-                }}
-              >
-                {getInitials(name)}
-              </div>
-            );
-          })}
-          {totalVoters > 5 && (
-            <span style={{ 
-              fontSize: 12, 
-              color: "#a16207",
-              marginLeft: 4,
-              fontWeight: 500,
-            }}>
-              +{totalVoters - 5}
-            </span>
-          )}
-          <span style={{ 
-            marginLeft: "auto", 
-            fontSize: 12, 
-            color: "#a16207",
+      {/* Collapsed: countdown + avatars + vote button */}
+      {!expanded && (
+        <div style={{ marginTop: 14 }}>
+          {/* Countdown timer */}
+          <div style={{ marginBottom: 14 }}>
+            <CountdownTimer deadline={poll?.deadline?.toDate()} />
+          </div>
+          
+          {/* Avatars and vote button row */}
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between",
+            gap: 12,
           }}>
-            Tap to vote →
-          </span>
+            {/* Left side: avatars or prompt */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {totalVoters > 0 ? (
+                <>
+                  {voterIds.slice(0, 4).map((uid, idx) => {
+                    const name = getVoterName(uid);
+                    return (
+                      <div
+                        key={uid}
+                        title={name}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          ...getAvatarStyle(name, 32),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          border: "2px solid #fef9c3",
+                          marginLeft: idx > 0 ? -10 : 0,
+                        }}
+                      >
+                        {getInitials(name)}
+                      </div>
+                    );
+                  })}
+                  <span style={{ 
+                    fontSize: 13, 
+                    color: "#a16207",
+                    marginLeft: 4,
+                    fontWeight: 500,
+                  }}>
+                    {totalVoters} voted
+                  </span>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: "#a16207" }}>
+                  Be the first to vote!
+                </span>
+              )}
+            </div>
+
+            {/* Right side: Vote button */}
+            <button
+              style={{
+                padding: "10px 20px",
+                borderRadius: 10,
+                border: "none",
+                background: "#854d0e",
+                color: "white",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                boxShadow: "0 2px 8px rgba(133, 77, 14, 0.3)",
+              }}
+            >
+              {hasVoted ? "Update vote" : "Vote now"}
+              <span>→</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Expanded voting form */}
       {expanded && (
-        <div onClick={(e) => e.stopPropagation()}>
-          {/* Responders list */}
+        <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 16 }}>
+          {/* Responders list with individual preferences */}
           {totalVoters > 0 && (
             <div style={{ 
               marginBottom: 16, 
@@ -300,41 +346,87 @@ export default function WeekendPoll({ poll, onVoteSubmit, allUsers = [] }) {
               background: "white", 
               borderRadius: 12,
             }}>
-              <div style={{ fontSize: 11, color: "#a16207", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <div style={{ fontSize: 11, color: "#a16207", marginBottom: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                 Responded ({totalVoters})
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {voterIds.map((uid) => {
                   const name = getVoterName(uid);
                   const isYou = uid === user?.uid;
+                  const voterPrefs = getVoterPrefs(uid);
+                  
                   return (
                     <div
                       key={uid}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 5,
-                        padding: "4px 10px",
+                        padding: "8px 12px",
                         background: isYou ? "#fef08a" : "#fefce8",
-                        borderRadius: 20,
-                        fontSize: 12,
+                        borderRadius: 10,
                         border: isYou ? "1px solid #facc15" : "1px solid #fde68a",
                       }}
                     >
+                      {/* Name row */}
                       <div style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        ...getAvatarStyle(name, 18),
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 8,
-                        fontWeight: 600,
+                        gap: 8,
+                        marginBottom: voterPrefs ? 6 : 0,
                       }}>
-                        {getInitials(name)}
+                        <div style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          ...getAvatarStyle(name, 24),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                          fontWeight: 600,
+                        }}>
+                          {getInitials(name)}
+                        </div>
+                        <span style={{ color: "#854d0e", fontWeight: 600, fontSize: 13 }}>
+                          {isYou ? "You" : name}
+                        </span>
                       </div>
-                      <span style={{ color: "#854d0e", fontWeight: 500 }}>{isYou ? "You" : name}</span>
+                      
+                      {/* Preferences row */}
+                      {voterPrefs && (
+                        <div style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 6,
+                          marginLeft: 32,
+                          fontSize: 11,
+                          color: "#a16207",
+                        }}>
+                          {voterPrefs.day && (
+                            <span style={{ padding: "2px 6px", background: "white", borderRadius: 4 }}>
+                              📅 {voterPrefs.day === "saturday" ? "Sat" : voterPrefs.day === "sunday" ? "Sun" : "Either"}
+                            </span>
+                          )}
+                          {voterPrefs.time && (
+                            <span style={{ padding: "2px 6px", background: "white", borderRadius: 4 }}>
+                              🕐 {voterPrefs.time === "am" ? "AM" : voterPrefs.time === "pm" ? "PM" : "Either"}
+                            </span>
+                          )}
+                          {voterPrefs.transport && (
+                            <span style={{ padding: "2px 6px", background: "white", borderRadius: 4 }}>
+                              {voterPrefs.transport === "cart" ? "🛺 Cart" : voterPrefs.transport === "walk" ? "🚶 Walk" : "Either"}
+                            </span>
+                          )}
+                          {voterPrefs.format && (
+                            <span style={{ padding: "2px 6px", background: "white", borderRadius: 4 }}>
+                              {voterPrefs.format === "scramble" ? "👥 Scramble" : voterPrefs.format === "stroke" ? "🏌️ Stroke" : "Either"}
+                            </span>
+                          )}
+                          {voterPrefs.course && (
+                            <span style={{ padding: "2px 6px", background: "white", borderRadius: 4 }}>
+                              ⛳ {voterPrefs.course}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
