@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../providers/AuthProvider";
 import { showToast, hapticFeedback } from "../utils/uiEffects";
+import { getInitials, getAvatarStyle } from "../utils/avatarUtils";
 import CountdownTimer from "./CountdownTimer";
 import CourseSelector from "./CourseSelector";
 
-// Option button component for single-select options
-function OptionButton({ label, selected, onClick, icon, disabled }) {
+// Compact option button
+function OptionButton({ label, selected, onClick, icon, disabled, small }) {
   return (
     <button
       type="button"
@@ -15,9 +16,8 @@ function OptionButton({ label, selected, onClick, icon, disabled }) {
       disabled={disabled}
       style={{
         flex: 1,
-        minWidth: 80,
-        padding: "12px 8px",
-        borderRadius: 10,
+        padding: small ? "8px 4px" : "10px 6px",
+        borderRadius: 8,
         border: `2px solid ${selected ? "var(--color-primary)" : "var(--color-border)"}`,
         background: selected ? "var(--color-primary-soft)" : "var(--color-surface)",
         color: selected ? "var(--color-primary)" : "var(--color-text)",
@@ -26,47 +26,18 @@ function OptionButton({ label, selected, onClick, icon, disabled }) {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 4,
+        gap: 2,
         opacity: disabled ? 0.6 : 1,
+        fontSize: small ? 10 : 11,
       }}
     >
-      {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
-      <span style={{ fontSize: 12, fontWeight: 500 }}>{label}</span>
+      {icon && <span style={{ fontSize: small ? 14 : 16 }}>{icon}</span>}
+      <span style={{ fontWeight: 500 }}>{label}</span>
     </button>
   );
 }
 
-// Results bar for showing vote tallies
-function ResultsBar({ label, votes, total, icon }) {
-  const percentage = total > 0 ? (votes / total) * 100 : 0;
-  
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-          {icon} {label}
-        </span>
-        <span style={{ fontSize: 13, fontWeight: 500 }}>{votes}</span>
-      </div>
-      <div style={{ 
-        height: 6, 
-        background: "var(--color-bg-tertiary)", 
-        borderRadius: 3,
-        overflow: "hidden",
-      }}>
-        <div style={{
-          height: "100%",
-          width: `${percentage}%`,
-          background: "var(--color-primary)",
-          borderRadius: 3,
-          transition: "width 0.3s ease",
-        }} />
-      </div>
-    </div>
-  );
-}
-
-export default function WeekendPoll({ poll, onVoteSubmit }) {
+export default function WeekendPoll({ poll, onVoteSubmit, allUsers = [] }) {
   const { user } = useAuth();
   const [votes, setVotes] = useState({
     day: null,
@@ -77,10 +48,11 @@ export default function WeekendPoll({ poll, onVoteSubmit }) {
   });
   const [saving, setSaving] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [favouriteCourses, setFavouriteCourses] = useState([]);
+  const [users, setUsers] = useState(allUsers);
 
-  // Load user's existing vote and favourite courses
+  // Load user's existing vote, favourite courses, and users
   useEffect(() => {
     if (poll?.votes && user?.uid) {
       const existingVote = poll.votes[user.uid];
@@ -90,41 +62,35 @@ export default function WeekendPoll({ poll, onVoteSubmit }) {
       }
     }
     
-    // Load favourite courses from settings
-    async function loadCourses() {
+    async function loadData() {
       try {
+        // Load favourite courses
         const settingsDoc = await getDoc(doc(db, "settings", "general"));
         if (settingsDoc.exists()) {
           setFavouriteCourses(settingsDoc.data().favouriteCourses || []);
         }
+        
+        // Load users if not provided
+        if (allUsers.length === 0) {
+          const usersSnap = await getDocs(collection(db, "users"));
+          setUsers(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        }
       } catch (err) {
-        console.error("Error loading favourite courses:", err);
+        console.error("Error loading data:", err);
       }
     }
-    loadCourses();
-  }, [poll, user]);
+    loadData();
+  }, [poll, user, allUsers]);
 
   const isPollClosed = poll?.deadline?.toDate() < new Date();
-  const totalVoters = Object.keys(poll?.votes || {}).length;
+  const voterIds = Object.keys(poll?.votes || {});
+  const totalVoters = voterIds.length;
 
-  // Calculate vote tallies
-  const tallies = {
-    day: { saturday: 0, sunday: 0, either: 0 },
-    time: { am: 0, pm: 0, either: 0 },
-    transport: { cart: 0, walk: 0, either: 0 },
-    format: { scramble: 0, stroke: 0, either: 0 },
-    course: {},
+  // Get voter names
+  const getVoterName = (uid) => {
+    const u = users.find(u => u.id === uid);
+    return u?.username || u?.email?.split("@")[0] || "User";
   };
-
-  Object.values(poll?.votes || {}).forEach((vote) => {
-    if (vote.day) tallies.day[vote.day]++;
-    if (vote.time) tallies.time[vote.time]++;
-    if (vote.transport) tallies.transport[vote.transport]++;
-    if (vote.format) tallies.format[vote.format]++;
-    if (vote.course) {
-      tallies.course[vote.course] = (tallies.course[vote.course] || 0) + 1;
-    }
-  });
 
   const handleVoteChange = (category, value) => {
     if (isPollClosed) return;
@@ -154,7 +120,6 @@ export default function WeekendPoll({ poll, onVoteSubmit }) {
       return;
     }
 
-    // Validate at least one selection
     const hasSelection = Object.values(votes).some((v) => v !== null);
     if (!hasSelection) {
       showToast("Please make at least one selection");
@@ -171,6 +136,7 @@ export default function WeekendPoll({ poll, onVoteSubmit }) {
       });
 
       setHasVoted(true);
+      setExpanded(false);
       showToast("Vote submitted!");
       if (onVoteSubmit) onVoteSubmit();
     } catch (err) {
@@ -187,234 +153,254 @@ export default function WeekendPoll({ poll, onVoteSubmit }) {
     const satDate = new Date(date);
     const sunDate = new Date(date);
     sunDate.setDate(sunDate.getDate() + 1);
-    
-    return `${satDate.toLocaleDateString("en-AU", { weekday: "short", day: "numeric" })} - ${sunDate.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}`;
+    return `${satDate.toLocaleDateString("en-AU", { day: "numeric" })}-${sunDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`;
   };
 
   return (
-    <div className="card" style={{ marginBottom: 20 }}>
+    <div 
+      style={{ 
+        padding: expanded ? 18 : 16,
+        borderRadius: 16,
+        background: "linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)",
+        border: "1px solid #fde047",
+        boxShadow: "0 2px 8px rgba(250, 204, 21, 0.15)",
+        cursor: expanded ? "default" : "pointer",
+        transition: "all 0.2s ease",
+      }}
+      onClick={() => !expanded && setExpanded(true)}
+    >
       {/* Header */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <span style={{ fontSize: 24 }}>🗳️</span>
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "flex-start",
+        marginBottom: expanded ? 16 : 0,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{
+            width: 42,
+            height: 42,
+            borderRadius: 12,
+            background: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+          }}>
+            🗳️
+          </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
-              Weekend of {formatWeekendDate()}
-            </h3>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)" }}>
-              {totalVoters} {totalVoters === 1 ? "response" : "responses"}
-            </p>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#854d0e", marginBottom: 2 }}>
+              Weekend Poll
+            </div>
+            <div style={{ fontSize: 14, color: "#a16207", fontWeight: 500 }}>
+              {formatWeekendDate()}
+            </div>
           </div>
         </div>
         
-        {/* Countdown */}
-        {!isPollClosed ? (
-          <CountdownTimer deadline={poll?.deadline?.toDate()} />
-        ) : (
-          <div style={{
-            padding: "8px 12px",
-            background: "var(--color-bg-tertiary)",
-            borderRadius: 8,
-            fontSize: 13,
-            color: "var(--color-text-secondary)",
-          }}>
-            Poll closed
-          </div>
-        )}
-      </div>
-
-      {/* Show results toggle for people who've voted */}
-      {hasVoted && !isPollClosed && (
-        <button
-          onClick={() => setShowResults(!showResults)}
-          style={{
-            width: "100%",
-            padding: "8px",
-            marginBottom: 16,
-            background: "var(--color-bg-secondary)",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 13,
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          {showResults ? "Hide results" : "Show current results"}
-        </button>
-      )}
-
-      {/* Voting form or Results */}
-      {(showResults || isPollClosed) ? (
-        // Results view
-        <div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>DAY</div>
-            <ResultsBar label="Saturday" votes={tallies.day.saturday} total={totalVoters} icon="📅" />
-            <ResultsBar label="Sunday" votes={tallies.day.sunday} total={totalVoters} icon="📅" />
-            <ResultsBar label="Either" votes={tallies.day.either} total={totalVoters} icon="🤷" />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>TIME</div>
-            <ResultsBar label="AM" votes={tallies.time.am} total={totalVoters} icon="🌅" />
-            <ResultsBar label="PM" votes={tallies.time.pm} total={totalVoters} icon="🌇" />
-            <ResultsBar label="Either" votes={tallies.time.either} total={totalVoters} icon="🤷" />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>TRANSPORT</div>
-            <ResultsBar label="Cart" votes={tallies.transport.cart} total={totalVoters} icon="🛺" />
-            <ResultsBar label="Walk" votes={tallies.transport.walk} total={totalVoters} icon="🚶" />
-            <ResultsBar label="Either" votes={tallies.transport.either} total={totalVoters} icon="🤷" />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>FORMAT</div>
-            <ResultsBar label="Scramble" votes={tallies.format.scramble} total={totalVoters} icon="👥" />
-            <ResultsBar label="Stroke" votes={tallies.format.stroke} total={totalVoters} icon="🏌️" />
-            <ResultsBar label="Either" votes={tallies.format.either} total={totalVoters} icon="🤷" />
-          </div>
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>COURSE</div>
-            {Object.entries(tallies.course)
-              .sort((a, b) => b[1] - a[1])
-              .map(([course, count]) => (
-                <ResultsBar key={course} label={course} votes={count} total={totalVoters} icon="⛳" />
-              ))}
-            {Object.keys(tallies.course).length === 0 && (
-              <p style={{ fontSize: 13, color: "var(--color-text-tertiary)" }}>No course votes yet</p>
-            )}
-          </div>
-
-          {!isPollClosed && (
+        <div style={{ textAlign: "right" }}>
+          {!expanded && (
+            <div style={{ 
+              fontSize: 12, 
+              color: "#a16207",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 2,
+            }}>
+              <CountdownTimer deadline={poll?.deadline?.toDate()} compact />
+              <span>{totalVoters} voted {hasVoted && "• ✓"}</span>
+            </div>
+          )}
+          {expanded && (
             <button
-              onClick={() => setShowResults(false)}
-              className="btn btn-secondary"
-              style={{ width: "100%", marginTop: 16 }}
+              onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "none",
+                background: "white",
+                cursor: "pointer",
+                fontSize: 12,
+                color: "#854d0e",
+                fontWeight: 500,
+              }}
             >
-              Edit my vote
+              Close ▲
             </button>
           )}
         </div>
-      ) : (
-        // Voting form
-        <div>
-          {/* Day */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>DAY</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <OptionButton
-                label="Saturday"
-                icon="📅"
-                selected={votes.day === "saturday"}
-                onClick={() => handleVoteChange("day", "saturday")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Sunday"
-                icon="📅"
-                selected={votes.day === "sunday"}
-                onClick={() => handleVoteChange("day", "sunday")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Either"
-                icon="🤷"
-                selected={votes.day === "either"}
-                onClick={() => handleVoteChange("day", "either")}
-                disabled={isPollClosed}
-              />
+      </div>
+
+      {/* Collapsed: show responders */}
+      {!expanded && totalVoters > 0 && (
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: 6, 
+          marginTop: 12,
+          paddingTop: 12,
+          borderTop: "1px solid #fde047",
+        }}>
+          <span style={{ fontSize: 12, color: "#a16207", marginRight: 4 }}>Responses:</span>
+          {voterIds.slice(0, 5).map((uid, idx) => {
+            const name = getVoterName(uid);
+            return (
+              <div
+                key={uid}
+                title={name}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  ...getAvatarStyle(name, 28),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  border: "2px solid #fef9c3",
+                  marginLeft: idx > 0 ? -6 : 0,
+                }}
+              >
+                {getInitials(name)}
+              </div>
+            );
+          })}
+          {totalVoters > 5 && (
+            <span style={{ 
+              fontSize: 12, 
+              color: "#a16207",
+              marginLeft: 4,
+              fontWeight: 500,
+            }}>
+              +{totalVoters - 5}
+            </span>
+          )}
+          <span style={{ 
+            marginLeft: "auto", 
+            fontSize: 12, 
+            color: "#a16207",
+          }}>
+            Tap to vote →
+          </span>
+        </div>
+      )}
+
+      {/* Expanded voting form */}
+      {expanded && (
+        <div onClick={(e) => e.stopPropagation()}>
+          {/* Responders list */}
+          {totalVoters > 0 && (
+            <div style={{ 
+              marginBottom: 16, 
+              padding: 12, 
+              background: "white", 
+              borderRadius: 12,
+            }}>
+              <div style={{ fontSize: 11, color: "#a16207", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Responded ({totalVoters})
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {voterIds.map((uid) => {
+                  const name = getVoterName(uid);
+                  const isYou = uid === user?.uid;
+                  return (
+                    <div
+                      key={uid}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "4px 10px",
+                        background: isYou ? "#fef08a" : "#fefce8",
+                        borderRadius: 20,
+                        fontSize: 12,
+                        border: isYou ? "1px solid #facc15" : "1px solid #fde68a",
+                      }}
+                    >
+                      <div style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        ...getAvatarStyle(name, 18),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 8,
+                        fontWeight: 600,
+                      }}>
+                        {getInitials(name)}
+                      </div>
+                      <span style={{ color: "#854d0e", fontWeight: 500 }}>{isYou ? "You" : name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Voting options - 2 column grid */}
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: "1fr 1fr", 
+            gap: 12, 
+            marginBottom: 12,
+            background: "white",
+            padding: 14,
+            borderRadius: 12,
+          }}>
+            {/* Day */}
+            <div>
+              <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 6 }}>DAY</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <OptionButton label="Sat" icon="📅" selected={votes.day === "saturday"} onClick={() => handleVoteChange("day", "saturday")} disabled={isPollClosed} small />
+                <OptionButton label="Sun" icon="📅" selected={votes.day === "sunday"} onClick={() => handleVoteChange("day", "sunday")} disabled={isPollClosed} small />
+                <OptionButton label="Either" selected={votes.day === "either"} onClick={() => handleVoteChange("day", "either")} disabled={isPollClosed} small />
+              </div>
+            </div>
+
+            {/* Time */}
+            <div>
+              <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 6 }}>TIME</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <OptionButton label="AM" icon="🌅" selected={votes.time === "am"} onClick={() => handleVoteChange("time", "am")} disabled={isPollClosed} small />
+                <OptionButton label="PM" icon="🌇" selected={votes.time === "pm"} onClick={() => handleVoteChange("time", "pm")} disabled={isPollClosed} small />
+                <OptionButton label="Either" selected={votes.time === "either"} onClick={() => handleVoteChange("time", "either")} disabled={isPollClosed} small />
+              </div>
+            </div>
+
+            {/* Transport */}
+            <div>
+              <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 6 }}>TRANSPORT</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <OptionButton label="Cart" icon="🛺" selected={votes.transport === "cart"} onClick={() => handleVoteChange("transport", "cart")} disabled={isPollClosed} small />
+                <OptionButton label="Walk" icon="🚶" selected={votes.transport === "walk"} onClick={() => handleVoteChange("transport", "walk")} disabled={isPollClosed} small />
+                <OptionButton label="Either" selected={votes.transport === "either"} onClick={() => handleVoteChange("transport", "either")} disabled={isPollClosed} small />
+              </div>
+            </div>
+
+            {/* Format */}
+            <div>
+              <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginBottom: 6 }}>FORMAT</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <OptionButton label="Scramble" icon="👥" selected={votes.format === "scramble"} onClick={() => handleVoteChange("format", "scramble")} disabled={isPollClosed} small />
+                <OptionButton label="Stroke" icon="🏌️" selected={votes.format === "stroke"} onClick={() => handleVoteChange("format", "stroke")} disabled={isPollClosed} small />
+                <OptionButton label="Either" selected={votes.format === "either"} onClick={() => handleVoteChange("format", "either")} disabled={isPollClosed} small />
+              </div>
             </div>
           </div>
 
-          {/* Time */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>TIME</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <OptionButton
-                label="AM"
-                icon="🌅"
-                selected={votes.time === "am"}
-                onClick={() => handleVoteChange("time", "am")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="PM"
-                icon="🌇"
-                selected={votes.time === "pm"}
-                onClick={() => handleVoteChange("time", "pm")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Either"
-                icon="🤷"
-                selected={votes.time === "either"}
-                onClick={() => handleVoteChange("time", "either")}
-                disabled={isPollClosed}
-              />
-            </div>
-          </div>
-
-          {/* Transport */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>TRANSPORT</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <OptionButton
-                label="Cart"
-                icon="🛺"
-                selected={votes.transport === "cart"}
-                onClick={() => handleVoteChange("transport", "cart")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Walk"
-                icon="🚶"
-                selected={votes.transport === "walk"}
-                onClick={() => handleVoteChange("transport", "walk")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Either"
-                icon="🤷"
-                selected={votes.transport === "either"}
-                onClick={() => handleVoteChange("transport", "either")}
-                disabled={isPollClosed}
-              />
-            </div>
-          </div>
-
-          {/* Format */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>FORMAT</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <OptionButton
-                label="Scramble"
-                icon="👥"
-                selected={votes.format === "scramble"}
-                onClick={() => handleVoteChange("format", "scramble")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Stroke"
-                icon="🏌️"
-                selected={votes.format === "stroke"}
-                onClick={() => handleVoteChange("format", "stroke")}
-                disabled={isPollClosed}
-              />
-              <OptionButton
-                label="Either"
-                icon="🤷"
-                selected={votes.format === "either"}
-                onClick={() => handleVoteChange("format", "either")}
-                disabled={isPollClosed}
-              />
-            </div>
-          </div>
-
-          {/* Course */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>COURSE</div>
+          {/* Course - full width */}
+          <div style={{ 
+            marginBottom: 14,
+            background: "white",
+            padding: 14,
+            borderRadius: 12,
+          }}>
+            <div style={{ fontSize: 11, color: "#a16207", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Course</div>
             <CourseSelector
               value={votes.course}
               onChange={(course) => setVotes((prev) => ({ ...prev, course }))}
@@ -425,14 +411,26 @@ export default function WeekendPoll({ poll, onVoteSubmit }) {
           </div>
 
           {/* Submit button */}
-          <button
-            onClick={handleSubmitVote}
-            disabled={saving || isPollClosed}
-            className="btn btn-primary"
-            style={{ width: "100%" }}
-          >
-            {saving ? "Submitting..." : hasVoted ? "Update Vote" : "Submit Vote"}
-          </button>
+          {!isPollClosed && (
+            <button
+              onClick={handleSubmitVote}
+              disabled={saving}
+              style={{
+                width: "100%",
+                padding: "14px 20px",
+                borderRadius: 12,
+                border: "none",
+                background: "#854d0e",
+                color: "white",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: saving ? "default" : "pointer",
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? "Submitting..." : hasVoted ? "Update Vote" : "Submit Vote"}
+            </button>
+          )}
         </div>
       )}
     </div>

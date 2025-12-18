@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { db } from "../firebase";
-import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, updateDoc, getDoc, setDoc, addDoc, Timestamp } from "firebase/firestore";
 import { Link } from "react-router-dom";
+import { showToast, hapticFeedback } from "../utils/uiEffects";
+import CourseAutocomplete from "../components/CourseAutocomplete";
 
 // Helper to get two initials from name/email
 const getInitials = (name) => {
@@ -16,13 +18,13 @@ const getInitials = (name) => {
 // Consistent avatar colours based on name
 const getAvatarColor = (name) => {
   const colors = [
-    ['#10b981', '#059669'], // green
-    ['#3b82f6', '#2563eb'], // blue
-    ['#8b5cf6', '#7c3aed'], // purple
-    ['#f59e0b', '#d97706'], // amber
-    ['#ec4899', '#db2777'], // pink
-    ['#06b6d4', '#0891b2'], // cyan
-    ['#f97316', '#ea580c'], // orange
+    ['#10b981', '#059669'],
+    ['#3b82f6', '#2563eb'],
+    ['#8b5cf6', '#7c3aed'],
+    ['#f59e0b', '#d97706'],
+    ['#ec4899', '#db2777'],
+    ['#06b6d4', '#0891b2'],
+    ['#f97316', '#ea580c'],
   ];
   const index = (name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
   return colors[index];
@@ -31,9 +33,19 @@ const getAvatarColor = (name) => {
 export default function Admin() {
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
+  const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Favourite courses
+  const [favouriteCourses, setFavouriteCourses] = useState([]);
+  const [newCourse, setNewCourse] = useState({ name: "", placeId: "" });
+  const [savingCourses, setSavingCourses] = useState(false);
+  
+  // Create poll
+  const [showCreatePoll, setShowCreatePoll] = useState(false);
+  const [pollDate, setPollDate] = useState("");
+  const [creatingPoll, setCreatingPoll] = useState(false);
 
-  // Colour palette matching Dashboard
   const colors = {
     booked: {
       badge: '#059669',
@@ -54,8 +66,18 @@ export default function Admin() {
       const userSnap = await getDocs(collection(db, "users"));
       const userList = userSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
+      const pollSnap = await getDocs(collection(db, "polls"));
+      const pollList = pollSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // Load settings
+      const settingsDoc = await getDoc(doc(db, "settings", "general"));
+      if (settingsDoc.exists()) {
+        setFavouriteCourses(settingsDoc.data().favouriteCourses || []);
+      }
+
       setEvents(eventList);
       setUsers(userList);
+      setPolls(pollList);
       setLoading(false);
     }
     load();
@@ -75,6 +97,107 @@ export default function Admin() {
     );
   };
 
+  const deletePoll = async (id) => {
+    if (!confirm("Delete this poll?")) return;
+    await deleteDoc(doc(db, "polls", id));
+    setPolls((prev) => prev.filter((p) => p.id !== id));
+    showToast("Poll deleted");
+  };
+
+  // Favourite courses handlers
+  const handleAddCourse = () => {
+    if (!newCourse.name.trim()) {
+      showToast("Please enter a course name");
+      return;
+    }
+    if (favouriteCourses.some((c) => c.name.toLowerCase() === newCourse.name.toLowerCase())) {
+      showToast("Course already exists");
+      return;
+    }
+    hapticFeedback("light");
+    setFavouriteCourses([...favouriteCourses, { 
+      name: newCourse.name.trim(), 
+      placeId: newCourse.placeId || null,
+    }]);
+    setNewCourse({ name: "", placeId: "" });
+  };
+
+  const handleRemoveCourse = (index) => {
+    hapticFeedback("light");
+    setFavouriteCourses(favouriteCourses.filter((_, i) => i !== index));
+  };
+
+  const saveFavouriteCourses = async () => {
+    setSavingCourses(true);
+    hapticFeedback("medium");
+    try {
+      await setDoc(doc(db, "settings", "general"), {
+        favouriteCourses,
+        updatedAt: new Date(),
+      }, { merge: true });
+      showToast("Courses saved!");
+    } catch (err) {
+      console.error("Error saving courses:", err);
+      showToast("Failed to save");
+    } finally {
+      setSavingCourses(false);
+    }
+  };
+
+  // Create poll handler
+  const handleCreatePoll = async () => {
+    if (!pollDate) {
+      showToast("Please select a date");
+      return;
+    }
+
+    setCreatingPoll(true);
+    hapticFeedback("medium");
+
+    try {
+      const saturday = new Date(pollDate);
+      saturday.setHours(0, 0, 0, 0);
+
+      // Check if poll already exists
+      const pollId = `poll_weekend_${saturday.toISOString().split("T")[0]}`;
+      const existingPoll = polls.find(p => p.id === pollId);
+      
+      if (existingPoll) {
+        showToast("Poll already exists for this weekend");
+        setCreatingPoll(false);
+        return;
+      }
+
+      // Calculate deadline (Friday before at midnight)
+      const deadline = new Date(saturday);
+      deadline.setDate(deadline.getDate() - 1);
+      deadline.setHours(23, 59, 59, 999);
+
+      await setDoc(doc(db, "polls", pollId), {
+        type: "weekend",
+        title: `Weekend of ${saturday.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`,
+        weekendOf: Timestamp.fromDate(saturday),
+        deadline: Timestamp.fromDate(deadline),
+        status: "open",
+        votes: {},
+        createdAt: Timestamp.now(),
+      });
+
+      // Refresh polls
+      const pollSnap = await getDocs(collection(db, "polls"));
+      setPolls(pollSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
+      showToast("Poll created!");
+      setPollDate("");
+      setShowCreatePoll(false);
+    } catch (err) {
+      console.error("Error creating poll:", err);
+      showToast("Failed to create poll");
+    } finally {
+      setCreatingPoll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -90,8 +213,183 @@ export default function Admin() {
       <div className="page-header">
         <div className="page-header-title">
           <h1>Admin</h1>
-          <p>Manage events and users</p>
+          <p>Manage events, polls, and settings</p>
         </div>
+      </div>
+
+      {/* FAVOURITE COURSES */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="section-header">
+          <span className="section-title">⛳ Favourite Courses</span>
+          <span className="section-count">{favouriteCourses.length}</span>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 16 }}>
+          These appear in poll dropdowns for course selection.
+        </p>
+
+        {favouriteCourses.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", marginBottom: 12 }}>
+            No courses added yet
+          </p>
+        ) : (
+          <div style={{ marginBottom: 12 }}>
+            {favouriteCourses.map((course, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px 12px",
+                  background: "var(--color-bg-secondary)",
+                  borderRadius: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>{course.name}</span>
+                <button
+                  onClick={() => handleRemoveCourse(index)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "var(--color-danger-soft)",
+                    color: "var(--color-danger)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <CourseAutocomplete
+              initialValue={newCourse.name}
+              onSelect={(course) => setNewCourse({ 
+                name: course.name || "", 
+                placeId: course.placeId || "" 
+              })}
+              placeholder="Add a course..."
+            />
+          </div>
+          <button onClick={handleAddCourse} className="btn btn-ghost" style={{ padding: "12px 16px" }}>
+            Add
+          </button>
+        </div>
+
+        <button 
+          onClick={saveFavouriteCourses} 
+          disabled={savingCourses}
+          className="btn btn-primary"
+          style={{ width: "100%" }}
+        >
+          {savingCourses ? "Saving..." : "Save Courses"}
+        </button>
+      </div>
+
+      {/* POLLS */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="section-header">
+          <span className="section-title">🗳️ Weekend Polls</span>
+          <span className="section-count">{polls.length}</span>
+        </div>
+
+        {polls.length === 0 ? (
+          <p style={{ color: "var(--color-text-secondary)", padding: "12px 0" }}>
+            No polls yet
+          </p>
+        ) : (
+          polls
+            .sort((a, b) => (b.weekendOf?.toMillis() || 0) - (a.weekendOf?.toMillis() || 0))
+            .map((poll, idx) => {
+              const weekendDate = poll.weekendOf?.toDate?.();
+              const deadline = poll.deadline?.toDate?.();
+              const voteCount = Object.keys(poll.votes || {}).length;
+              const isOpen = poll.status === "open" && deadline > new Date();
+
+              return (
+                <div
+                  key={poll.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 0",
+                    borderBottom: idx < polls.length - 1 ? "1px solid var(--color-divider)" : "none",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 500, marginBottom: 2 }}>
+                      {weekendDate?.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                      {voteCount} votes • {isOpen ? "Open" : poll.status === "converted" ? "Converted" : "Closed"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deletePoll(poll.id)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: "var(--color-danger)" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              );
+            })
+        )}
+
+        {/* Create Poll Button */}
+        {!showCreatePoll ? (
+          <button
+            onClick={() => setShowCreatePoll(true)}
+            className="btn btn-ghost"
+            style={{ width: "100%", marginTop: 12 }}
+          >
+            + Create Weekend Poll
+          </button>
+        ) : (
+          <div style={{ marginTop: 12, padding: 12, background: "var(--color-bg-secondary)", borderRadius: 10 }}>
+            <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)" }}>
+              Select Saturday of weekend
+            </label>
+            <input
+              type="date"
+              value={pollDate}
+              onChange={(e) => setPollDate(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "2px solid var(--color-border)",
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
+                fontSize: 14,
+                marginBottom: 12,
+              }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleCreatePoll}
+                disabled={creatingPoll || !pollDate}
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+              >
+                {creatingPoll ? "Creating..." : "Create Poll"}
+              </button>
+              <button
+                onClick={() => setShowCreatePoll(false)}
+                className="btn btn-ghost"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* EVENTS */}
@@ -180,9 +478,8 @@ export default function Admin() {
 
         {users.map((u, idx) => {
           const displayName = u.username || u.email || "?";
-          const initials = getInitials(displayName);
-          const [colorLight, colorDark] = getAvatarColor(displayName);
-          
+          const avatarColors = getAvatarColor(displayName);
+
           return (
             <div
               key={u.id}
@@ -192,48 +489,36 @@ export default function Admin() {
                 alignItems: "center",
                 padding: "12px 0",
                 borderBottom: idx < users.length - 1 ? "1px solid var(--color-divider)" : "none",
-                gap: 12,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
                   width: 36,
                   height: 36,
-                  borderRadius: '50%',
-                  background: `linear-gradient(135deg, ${colorLight} 0%, ${colorDark} 100%)`,
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${avatarColors[0]} 0%, ${avatarColors[1]} 100%)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
                   fontWeight: 600,
                   fontSize: 13,
-                  flexShrink: 0,
                 }}>
-                  {initials}
+                  {getInitials(displayName)}
                 </div>
                 <div>
-                  <span style={{ fontWeight: 500 }}>{displayName}</span>
-                  {u.isAdmin && (
-                    <span style={{
-                      marginLeft: 8,
-                      fontSize: 11,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      background: "var(--color-primary-soft)",
-                      color: "var(--color-primary)",
-                      fontWeight: 500,
-                    }}>
-                      Admin
-                    </span>
+                  <div style={{ fontWeight: 500 }}>{displayName}</div>
+                  {u.username && u.email && (
+                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>{u.email}</div>
                   )}
                 </div>
               </div>
 
               <button
-                className="btn btn-ghost btn-sm"
                 onClick={() => toggleAdmin(u.id, u.isAdmin)}
+                className={`btn btn-sm ${u.isAdmin ? 'btn-primary' : 'btn-ghost'}`}
               >
-                {u.isAdmin ? "Remove Admin" : "Make Admin"}
+                {u.isAdmin ? "Admin ✓" : "Make Admin"}
               </button>
             </div>
           );

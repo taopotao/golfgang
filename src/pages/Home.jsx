@@ -41,24 +41,6 @@ export default function Home() {
   });
   const [creating, setCreating] = useState(false);
 
-  // Color scheme
-  const colors = {
-    booked: {
-      bg: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
-      border: "#10b981",
-      badge: "#059669",
-      badgeText: "#ffffff",
-    },
-    proposed: {
-      bg: "#ffffff",
-      border: "var(--color-border)",
-      accent: "#3b82f6",
-      badge: "#eff6ff",
-      badgeText: "#2563eb",
-      badgeBorder: "#bfdbfe",
-    },
-  };
-
   // Load all data
   useEffect(() => {
     // Events
@@ -131,12 +113,6 @@ export default function Home() {
       return evDate && evDate >= now;
     })
     .sort((a, b) => a.date.toMillis() - b.date.toMillis());
-  
-  // My upcoming events (where I'm available)
-  const myUpcomingEvents = upcomingEvents.filter((ev) => {
-    const myStatus = user && ev.responses ? getResponseStatus(ev.responses[user.uid]) : null;
-    return myStatus === "available";
-  });
 
   // Events needing my response
   const needsResponse = upcomingEvents.filter((ev) => {
@@ -180,7 +156,7 @@ export default function Home() {
   };
 
   // Event card component
-  const EventCard = ({ event, showDate = true }) => {
+  const EventCard = ({ event }) => {
     const dateObj = event.date?.toDate();
     const myStatus = user && event.responses ? getResponseStatus(event.responses[user.uid]) : null;
     const attendingCount = event.responses
@@ -192,60 +168,113 @@ export default function Home() {
         to={`/event/${event.id}`}
         style={{
           display: "block",
-          padding: 16,
-          borderRadius: 12,
+          padding: "16px 18px",
+          borderRadius: 16,
           textDecoration: "none",
           color: "inherit",
-          background: event.booked ? colors.booked.bg : colors.proposed.bg,
-          border: `2px solid ${event.booked ? colors.booked.border : colors.proposed.border}`,
+          background: event.booked 
+            ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)" 
+            : "white",
+          border: event.booked 
+            ? "1px solid #86efac" 
+            : "1px solid var(--color-border)",
+          boxShadow: event.booked
+            ? "0 2px 8px rgba(34, 197, 94, 0.1)"
+            : "0 2px 8px rgba(0,0,0,0.04)",
           transition: "all 0.2s ease",
         }}
       >
-        {/* Date & Status */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-          {showDate && dateObj && (
-            <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-              {dateObj.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
-              {event.tee && ` • ${event.tee}`}
-            </div>
-          )}
-          <span
-            style={{
-              padding: "4px 8px",
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              ...(event.booked
-                ? { background: colors.booked.badge, color: colors.booked.badgeText }
-                : { background: colors.proposed.badge, color: colors.proposed.badgeText, border: `1px solid ${colors.proposed.badgeBorder}` }),
-            }}
-          >
-            {event.booked ? "✓ Booked" : "Proposed"}
+        {/* Top row - date and badge */}
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          marginBottom: 10,
+        }}>
+          <span style={{ 
+            fontSize: 13, 
+            color: "var(--color-text-secondary)",
+            fontWeight: 500,
+          }}>
+            {dateObj?.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
+            {event.tee && <span style={{ color: "var(--color-text-tertiary)" }}> • {event.tee}</span>}
+          </span>
+          <span style={{
+            padding: "5px 10px",
+            borderRadius: 20,
+            fontSize: 11,
+            fontWeight: 600,
+            background: event.booked ? "#22c55e" : "#e0e7ff",
+            color: event.booked ? "white" : "#4f46e5",
+          }}>
+            {event.booked ? "✓ Booked" : "Open"}
           </span>
         </div>
 
         {/* Title */}
-        <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{event.title}</div>
+        <h3 style={{ 
+          margin: "0 0 6px 0", 
+          fontSize: 17, 
+          fontWeight: 600,
+          color: "var(--color-text)",
+        }}>
+          {event.title}
+        </h3>
 
         {/* Course */}
         {event.courseName && (
-          <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 8 }}>
-            📍 {event.courseName}
+          <div style={{ 
+            fontSize: 14, 
+            color: "var(--color-text-secondary)", 
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}>
+            <span>📍</span>
+            <span>{event.courseName}</span>
           </div>
         )}
 
-        {/* Footer */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
-            <span style={{ color: "var(--color-text-secondary)" }}>👥 {attendingCount}/4</span>
-            {myStatus === "available" && (
-              <span style={{ color: colors.booked.badge, fontWeight: 600 }}>✓ You're in</span>
-            )}
-            {!myStatus && !event.booked && (
-              <span style={{ color: colors.proposed.badgeText, fontWeight: 500 }}>Awaiting response</span>
-            )}
+        {/* Footer - players and status */}
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "space-between",
+          paddingTop: 10,
+          borderTop: "1px solid var(--color-border)",
+        }}>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 6,
+            fontSize: 13,
+            color: "var(--color-text-secondary)",
+          }}>
+            <span>👥</span>
+            <span>{attendingCount}/4 players</span>
           </div>
-          <span style={{ fontSize: 16, color: "var(--color-text-tertiary)" }}>→</span>
+          
+          {myStatus === "available" ? (
+            <span style={{ 
+              fontSize: 13, 
+              fontWeight: 600, 
+              color: "#22c55e",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}>
+              <span>✓</span> You're in
+            </span>
+          ) : !event.booked ? (
+            <span style={{ 
+              fontSize: 13, 
+              color: "#6366f1",
+              fontWeight: 500,
+            }}>
+              RSVP →
+            </span>
+          ) : null}
         </div>
       </Link>
     );
@@ -254,27 +283,50 @@ export default function Home() {
   if (loading) {
     return (
       <div className="page">
-        <div className="card" style={{ textAlign: "center", padding: 40 }}>
-          Loading...
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "center", 
+          alignItems: "center", 
+          minHeight: 200,
+        }}>
+          <div style={{ 
+            width: 40, 
+            height: 40, 
+            border: "3px solid var(--color-border)",
+            borderTopColor: "var(--color-primary)",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+          }} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="page">
+    <div className="page" style={{ paddingBottom: 100 }}>
       {/* Header */}
       <div style={{ 
         display: "flex", 
         justifyContent: "space-between", 
         alignItems: "center",
-        marginBottom: 20,
+        marginBottom: 24,
       }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>What's on</h1>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>What's on</h1>
+          <p style={{ margin: "4px 0 0 0", fontSize: 14, color: "var(--color-text-secondary)" }}>
+            {upcomingEvents.length} upcoming {upcomingEvents.length === 1 ? "round" : "rounds"}
+          </p>
+        </div>
         {isAdmin && (
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary"
             onClick={() => setShowCreateEvent(true)}
+            style={{ 
+              borderRadius: 12,
+              padding: "10px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
           >
             + Event
           </button>
@@ -283,32 +335,35 @@ export default function Home() {
 
       {/* WEEKEND POLL */}
       {activePoll && (
-        <section style={{ marginBottom: 24 }}>
-          <WeekendPoll poll={activePoll} />
+        <section style={{ marginBottom: 28 }}>
+          <WeekendPoll poll={activePoll} allUsers={allUsers} />
         </section>
       )}
 
       {/* NEEDS YOUR RESPONSE */}
       {needsResponse.length > 0 && (
-        <section style={{ marginBottom: 24 }}>
+        <section style={{ marginBottom: 28 }}>
           <div style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
+            gap: 10,
+            marginBottom: 14,
           }}>
-            <span style={{
-              padding: "4px 10px",
-              background: "var(--color-warning-soft)",
-              color: "var(--color-warning)",
-              borderRadius: 20,
-              fontSize: 12,
-              fontWeight: 600,
+            <div style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#f59e0b",
+              animation: "pulse 2s infinite",
+            }} />
+            <span style={{ 
+              fontSize: 13, 
+              fontWeight: 600, 
+              color: "var(--color-text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
             }}>
-              {needsResponse.length} awaiting
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-secondary)" }}>
-              Needs your response
+              Needs your response ({needsResponse.length})
             </span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -319,51 +374,53 @@ export default function Home() {
         </section>
       )}
 
-      {/* MY UPCOMING ROUNDS */}
-      {myUpcomingEvents.length > 0 && (
-        <section style={{ marginBottom: 24 }}>
-          <div className="section-header">
-            <span className="section-title">My Upcoming Rounds</span>
-            <span className="section-count">{myUpcomingEvents.length}</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {myUpcomingEvents.slice(0, 3).map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
-          {myUpcomingEvents.length > 3 && (
-            <Link
-              to="/my-events"
-              style={{
-                display: "block",
-                textAlign: "center",
-                padding: 12,
-                marginTop: 8,
-                color: "var(--color-primary)",
-                fontSize: 14,
-                fontWeight: 500,
-              }}
-            >
-              View all {myUpcomingEvents.length} rounds →
-            </Link>
-          )}
-        </section>
-      )}
-
-      {/* ALL UPCOMING EVENTS */}
-      <section style={{ marginBottom: 24 }}>
-        <div className="section-header">
-          <span className="section-title">All Upcoming</span>
-          <span className="section-count">{upcomingEvents.length}</span>
+      {/* UPCOMING EVENTS */}
+      <section style={{ marginBottom: 28 }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 14,
+        }}>
+          <span style={{ 
+            fontSize: 13, 
+            fontWeight: 600, 
+            color: "var(--color-text-secondary)",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          }}>
+            Upcoming Rounds
+          </span>
+          <span style={{ 
+            fontSize: 12, 
+            color: "var(--color-text-tertiary)",
+            background: "var(--color-bg-secondary)",
+            padding: "4px 10px",
+            borderRadius: 12,
+          }}>
+            {upcomingEvents.length}
+          </span>
         </div>
+        
         {upcomingEvents.length === 0 ? (
-          <div className="card" style={{ textAlign: "center", padding: 30 }}>
-            <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>🏌️</span>
-            <p style={{ color: "var(--color-text-secondary)", margin: 0 }}>No upcoming events</p>
+          <div style={{ 
+            textAlign: "center", 
+            padding: "40px 20px",
+            background: "var(--color-bg-secondary)",
+            borderRadius: 16,
+            border: "2px dashed var(--color-border)",
+          }}>
+            <span style={{ fontSize: 48, display: "block", marginBottom: 12 }}>🏌️</span>
+            <p style={{ 
+              color: "var(--color-text-secondary)", 
+              margin: "0 0 16px 0",
+              fontSize: 15,
+            }}>
+              No upcoming rounds scheduled
+            </p>
             {isAdmin && (
               <button
                 className="btn btn-primary"
-                style={{ marginTop: 16 }}
                 onClick={() => setShowCreateEvent(true)}
               >
                 Create First Event
@@ -380,18 +437,48 @@ export default function Home() {
       </section>
 
       {/* WEEKDAY PROPOSALS */}
-      <section style={{ marginBottom: 24 }}>
+      <section>
         <div 
-          className="section-header"
           onClick={() => setShowWeekdayForm(!showWeekdayForm)}
-          style={{ cursor: "pointer" }}
+          style={{ 
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 14,
+            cursor: "pointer",
+            padding: "12px 16px",
+            background: "var(--color-bg-secondary)",
+            borderRadius: 12,
+          }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="section-title">Weekday Golf</span>
-            <span className="section-count">{weekdayProposals.length}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 18 }}>📅</span>
+            <span style={{ 
+              fontSize: 14, 
+              fontWeight: 600, 
+              color: "var(--color-text)",
+            }}>
+              Weekday Golf
+            </span>
+            {weekdayProposals.length > 0 && (
+              <span style={{ 
+                fontSize: 12, 
+                color: "var(--color-text-tertiary)",
+                background: "var(--color-surface)",
+                padding: "2px 8px",
+                borderRadius: 10,
+              }}>
+                {weekdayProposals.length}
+              </span>
+            )}
           </div>
-          <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>
-            {showWeekdayForm ? "▲" : "▼"}
+          <span style={{ 
+            fontSize: 12, 
+            color: "var(--color-text-tertiary)",
+            transform: showWeekdayForm ? "rotate(180deg)" : "none",
+            transition: "transform 0.2s ease",
+          }}>
+            ▼
           </span>
         </div>
 
@@ -404,7 +491,7 @@ export default function Home() {
           </div>
         )}
 
-        {weekdayProposals.length > 0 ? (
+        {weekdayProposals.length > 0 && (
           <div>
             {weekdayProposals.map((proposal) => (
               <WeekdayProposalCard
@@ -414,40 +501,18 @@ export default function Home() {
               />
             ))}
           </div>
-        ) : (
-          <div
-            className="card"
-            style={{
-              textAlign: "center",
-              padding: 20,
-              background: "var(--color-bg-secondary)",
-            }}
-          >
-            <p style={{ color: "var(--color-text-secondary)", margin: 0, fontSize: 14 }}>
-              No weekday proposals yet
-            </p>
-            {!showWeekdayForm && (
-              <button
-                className="btn btn-ghost"
-                style={{ marginTop: 12 }}
-                onClick={() => setShowWeekdayForm(true)}
-              >
-                + Propose a date
-              </button>
-            )}
-          </div>
         )}
       </section>
 
       {/* CREATE EVENT MODAL */}
       {showCreateEvent && (
         <div className="modal-backdrop" onClick={() => setShowCreateEvent(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0, marginBottom: 20 }}>Create Event</h2>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ borderRadius: 20 }}>
+            <h2 style={{ margin: "0 0 20px 0", fontSize: 20 }}>Create Event</h2>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
-                <label style={{ display: "block", fontSize: 13, marginBottom: 4, color: "var(--color-text-secondary)" }}>
+                <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)", fontWeight: 500 }}>
                   Title
                 </label>
                 <input
@@ -455,35 +520,39 @@ export default function Home() {
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                   placeholder="e.g. Saturday Morning Golf"
+                  style={{ borderRadius: 10 }}
                 />
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: 13, marginBottom: 4, color: "var(--color-text-secondary)" }}>
-                  Date
-                </label>
-                <input
-                  className="input"
-                  type="date"
-                  value={newEvent.date}
-                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)", fontWeight: 500 }}>
+                    Date
+                  </label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={newEvent.date}
+                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    style={{ borderRadius: 10 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)", fontWeight: 500 }}>
+                    Tee Time
+                  </label>
+                  <input
+                    className="input"
+                    type="time"
+                    value={newEvent.tee}
+                    onChange={(e) => setNewEvent({ ...newEvent, tee: e.target.value })}
+                    style={{ borderRadius: 10 }}
+                  />
+                </div>
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: 13, marginBottom: 4, color: "var(--color-text-secondary)" }}>
-                  Tee Time
-                </label>
-                <input
-                  className="input"
-                  value={newEvent.tee}
-                  onChange={(e) => setNewEvent({ ...newEvent, tee: e.target.value })}
-                  placeholder="e.g. 7:00 AM"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: 13, marginBottom: 4, color: "var(--color-text-secondary)" }}>
+                <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)", fontWeight: 500 }}>
                   Course
                 </label>
                 <CourseAutocomplete
@@ -493,7 +562,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: 13, marginBottom: 4, color: "var(--color-text-secondary)" }}>
+                <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)", fontWeight: 500 }}>
                   Notes (optional)
                 </label>
                 <textarea
@@ -502,24 +571,26 @@ export default function Home() {
                   value={newEvent.notes}
                   onChange={(e) => setNewEvent({ ...newEvent, notes: e.target.value })}
                   placeholder="Any extra details..."
+                  style={{ borderRadius: 10 }}
                 />
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowCreateEvent(false)}
+                style={{ flex: 1, borderRadius: 10 }}
+              >
+                Cancel
+              </button>
               <button
                 className="btn btn-primary"
-                style={{ flex: 1 }}
+                style={{ flex: 2, borderRadius: 10 }}
                 onClick={handleCreateEvent}
                 disabled={creating || !newEvent.title.trim() || !newEvent.date}
               >
                 {creating ? "Creating..." : "Create Event"}
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowCreateEvent(false)}
-              >
-                Cancel
               </button>
             </div>
           </div>
