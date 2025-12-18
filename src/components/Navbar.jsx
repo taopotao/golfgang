@@ -63,12 +63,13 @@ export default function Navbar() {
           {user && (
             <>
               {/* Desktop nav links */}
-              <div className="top-nav-links desktop-only">
+            <div className="top-nav-links desktop-only">
                 <Link 
                   to="/" 
                   className={location.pathname === '/' ? 'active' : ''}
                 >
                   Events
+              
                 </Link>
                 {isAdmin && (
                   <Link 

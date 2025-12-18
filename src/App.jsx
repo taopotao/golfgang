@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import BottomNav from './components/BottomNav'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
+import Home from "./pages/Home";
 import MyEvents from './pages/MyEvents'
 import EventPage from "./pages/event/EventPage";
 import Admin from './pages/Admin'
@@ -12,6 +12,8 @@ import ResetPassword from "./pages/ResetPassword";
 import ChangeUsername from "./pages/ChangeUsername";
 import Profile from "./pages/Profile";
 import Signup from "./pages/Signup";
+import Polls from "./pages/Polls";
+import AdminSettings from "./pages/AdminSettings";
 
 export default function App() {
   return (
@@ -23,7 +25,7 @@ export default function App() {
             path="/"
             element={
               <RequireAuth>
-                <Dashboard />
+                <Home />
               </RequireAuth>
             }
           />
@@ -79,6 +81,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+<Route path="/admin/settings" element={<AdminSettings />} />
         </Routes>
       </main>
       
