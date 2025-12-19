@@ -321,18 +321,22 @@ export default function WeekendPoll({ poll, onVoteSubmit, allUsers = [] }) {
   };
 
   return (
-    <div 
-      style={{ 
-        borderRadius: 16,
-        background: "white",
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-        overflow: "hidden",
-        cursor: expanded ? "default" : "pointer",
-        transition: "all 0.2s ease",
-      }}
-      onClick={() => !expanded && setExpanded(true)}
-    >
+        <div 
+          className={!hasVoted && !isPollClosed ? "poll-needs-attention" : ""}
+          style={{ 
+            borderRadius: 16,
+            background: "white",
+            border: !hasVoted && !isPollClosed 
+              ? "1px solid #86efac" 
+              : "1px solid #e5e7eb",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+            overflow: "hidden",
+            cursor: expanded ? "default" : "pointer",
+            transition: "all 0.2s ease",
+          }}
+          onClick={() => !expanded && setExpanded(true)}
+        >
+          
       {/* Golf Course Header Illustration */}
       <GolfCourseHeader />
 

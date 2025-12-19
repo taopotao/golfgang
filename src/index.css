@@ -1617,3 +1617,17 @@ label {
   overflow: visible !important;
   z-index: 10;
 }
+
+/* Weekend poll attention pulse */
+@keyframes pollPulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(34, 197, 94, 0.5);
+  }
+}
+
+.poll-needs-attention {
+  animation: pollPulse 2s ease-in-out infinite;
+}

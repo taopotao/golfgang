@@ -515,7 +515,7 @@ export function WeekdayProposalCard({ proposal, onUpdate, onDelete, allUsers = [
 export function CreateProposalForm({ onCreated, favouriteCourses = [] }) {
   const { user, profile } = useAuth();
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("16:00");
+  const [time, setTime] = useState("12:00");
   const [course, setCourse] = useState(null);
   const [creating, setCreating] = useState(false);
 
