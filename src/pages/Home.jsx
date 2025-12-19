@@ -41,6 +41,27 @@ export default function Home() {
   });
   const [creating, setCreating] = useState(false);
 
+// Format date as event title: "⛳ Sunday 21st December"
+const formatDateAsTitle = (dateString) => {
+  if (!dateString) return "";
+  
+  // Parse the date string directly to avoid timezone issues
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  
+  const weekday = date.toLocaleDateString("en-AU", { weekday: "long" });
+  const monthName = date.toLocaleDateString("en-AU", { month: "long" });
+  
+  // Add ordinal suffix (1st, 2nd, 3rd, etc.)
+  const ordinal = (n) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+  
+  return `⛳ ${weekday} ${ordinal(day)} ${monthName}`;
+};
+
   // Load all data
   useEffect(() => {
     // Events
@@ -534,12 +555,19 @@ export default function Home() {
                     Date
                   </label>
                   <input
-                    className="input"
-                    type="date"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                    style={{ borderRadius: 10 }}
-                  />
+                      className="input"
+                      type="date"
+                      value={newEvent.date}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        setNewEvent((prev) => ({ 
+                          ...prev, 
+                          date: newDate,
+                          title: formatDateAsTitle(newDate),
+                        }));
+                      }}
+                      style={{ borderRadius: 10 }}
+                    />
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 13, marginBottom: 6, color: "var(--color-text-secondary)", fontWeight: 500 }}>
