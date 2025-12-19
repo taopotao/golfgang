@@ -135,6 +135,49 @@ export default function Admin() {
     setEditingPollId(poll.id);
   };
 
+  // Share poll
+  const sharePoll = async (poll) => {
+    hapticFeedback("light");
+    
+    const weekendDate = poll.weekendOf?.toDate?.();
+    const deadline = poll.deadline?.toDate?.();
+    const voteCount = Object.keys(poll.votes || {}).length;
+    
+    // Format dates
+    const satDate = weekendDate ? new Date(weekendDate) : null;
+    const sunDate = satDate ? new Date(satDate) : null;
+    if (sunDate) sunDate.setDate(sunDate.getDate() + 1);
+    
+    const weekendStr = satDate 
+      ? `${satDate.toLocaleDateString("en-AU", { weekday: "long", day: "numeric" })} - ${sunDate?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" })}`
+      : "";
+    
+    const deadlineStr = deadline
+      ? deadline.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "short" }) + 
+        " at " + deadline.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })
+      : "";
+
+    // Build correct URL
+    const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : '');
+    const pollUrl = `${baseUrl}/`;
+
+    // Build message
+    let msg = `🗳️ *Weekend Golf Poll*\n`;
+    if (weekendStr) msg += `📅 ${weekendStr}\n`;
+    msg += `\n⛳ Who's in for golf this weekend?\n`;
+    msg += `Vote for your preferred day, time & course!\n`;
+    if (voteCount > 0) msg += `\n👥 ${voteCount} ${voteCount === 1 ? "person has" : "people have"} voted\n`;
+    if (deadlineStr) msg += `⏰ Voting closes: ${deadlineStr}\n`;
+    msg += `\n🔗 Vote now:\n${pollUrl}`;
+
+    try {
+      await navigator.clipboard.writeText(msg);
+      showToast("Copied to clipboard! 📋");
+    } catch {
+      showToast("Could not copy");
+    }
+  };
+
   const saveDeadline = async (pollId) => {
     if (!editDeadline) {
       showToast("Please select a deadline");
@@ -409,6 +452,13 @@ export default function Admin() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => sharePoll(poll)}
+                        className="btn btn-ghost btn-sm"
+                        title="Share poll"
+                      >
+                        📤
+                      </button>
                       <button
                         onClick={() => startEditDeadline(poll)}
                         className="btn btn-ghost btn-sm"
