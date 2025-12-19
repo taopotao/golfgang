@@ -47,6 +47,11 @@ export default function Admin() {
   const [pollDate, setPollDate] = useState("");
   const [creatingPoll, setCreatingPoll] = useState(false);
 
+  // Edit poll deadline
+  const [editingPollId, setEditingPollId] = useState(null);
+  const [editDeadline, setEditDeadline] = useState("");
+  const [savingDeadline, setSavingDeadline] = useState(false);
+
   const colors = {
     booked: {
       badge: '#059669',
@@ -117,6 +122,57 @@ export default function Admin() {
     await deleteDoc(doc(db, "weekdayProposals", id));
     setWeekdayProposals((prev) => prev.filter((p) => p.id !== id));
     showToast("Proposal deleted");
+  };
+
+  // Edit poll deadline
+  const startEditDeadline = (poll) => {
+    const deadline = poll.deadline?.toDate?.();
+    if (deadline) {
+      // Format as datetime-local value
+      const local = new Date(deadline.getTime() - deadline.getTimezoneOffset() * 60000);
+      setEditDeadline(local.toISOString().slice(0, 16));
+    }
+    setEditingPollId(poll.id);
+  };
+
+  const saveDeadline = async (pollId) => {
+    if (!editDeadline) {
+      showToast("Please select a deadline");
+      return;
+    }
+
+    setSavingDeadline(true);
+    hapticFeedback("medium");
+
+    try {
+      const newDeadline = new Date(editDeadline);
+      await updateDoc(doc(db, "polls", pollId), {
+        deadline: Timestamp.fromDate(newDeadline),
+      });
+
+      // Update local state
+      setPolls((prev) =>
+        prev.map((p) =>
+          p.id === pollId
+            ? { ...p, deadline: Timestamp.fromDate(newDeadline) }
+            : p
+        )
+      );
+
+      showToast("Deadline updated!");
+      setEditingPollId(null);
+      setEditDeadline("");
+    } catch (err) {
+      console.error("Error updating deadline:", err);
+      showToast("Failed to update deadline");
+    } finally {
+      setSavingDeadline(false);
+    }
+  };
+
+  const cancelEditDeadline = () => {
+    setEditingPollId(null);
+    setEditDeadline("");
   };
 
   // Favourite courses handlers
@@ -326,33 +382,93 @@ export default function Admin() {
               const deadline = poll.deadline?.toDate?.();
               const voteCount = Object.keys(poll.votes || {}).length;
               const isOpen = poll.status === "open" && deadline > new Date();
+              const isEditing = editingPollId === poll.id;
 
               return (
                 <div
                   key={poll.id}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
                     padding: "12px 0",
                     borderBottom: idx < polls.length - 1 ? "1px solid var(--color-divider)" : "none",
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: 500, marginBottom: 2 }}>
-                      {weekendDate?.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 500, marginBottom: 2 }}>
+                        {weekendDate?.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                        {voteCount} votes • {isOpen ? "Open" : poll.status === "converted" ? "Converted" : "Closed"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                        Closes: {deadline?.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })} at {deadline?.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                      {voteCount} votes • {isOpen ? "Open" : poll.status === "converted" ? "Converted" : "Closed"}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => startEditDeadline(poll)}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deletePoll(poll.id)}
+                        className="btn btn-ghost btn-sm"
+                        style={{ color: "var(--color-danger)" }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => deletePoll(poll.id)}
-                    className="btn btn-ghost btn-sm"
-                    style={{ color: "var(--color-danger)" }}
-                  >
-                    Delete
-                  </button>
+
+                  {/* Edit deadline form */}
+                  {isEditing && (
+                    <div style={{
+                      marginTop: 12,
+                      padding: 12,
+                      background: "var(--color-bg-secondary)",
+                      borderRadius: 10,
+                    }}>
+                      <label style={{ display: "block", fontSize: 12, marginBottom: 6, color: "var(--color-text-secondary)" }}>
+                        New deadline
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={editDeadline}
+                        onChange={(e) => setEditDeadline(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          border: "2px solid var(--color-border)",
+                          background: "var(--color-surface)",
+                          color: "var(--color-text)",
+                          fontSize: 14,
+                          marginBottom: 10,
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => saveDeadline(poll.id)}
+                          disabled={savingDeadline}
+                          className="btn btn-primary btn-sm"
+                          style={{ flex: 1 }}
+                        >
+                          {savingDeadline ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={cancelEditDeadline}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })

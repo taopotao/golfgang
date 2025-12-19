@@ -101,10 +101,10 @@ export default function Home() {
   // Filter and sort data
   const now = new Date();
   
-  // Active weekend poll (open, deadline in future)
-  const activePoll = weekendPolls.find((p) => 
-    p.status === "open" && p.deadline?.toDate() > now
-  );
+  // Active weekend polls (open, deadline in future) - show ALL, not just one
+  const activePolls = weekendPolls
+    .filter((p) => p.status === "open" && p.deadline?.toDate() > now)
+    .sort((a, b) => a.weekendOf?.toMillis() - b.weekendOf?.toMillis()); // Sort by weekend date (soonest first)
   
   // Upcoming events (future, sorted by date)
   const upcomingEvents = events
@@ -333,12 +333,16 @@ export default function Home() {
         )}
       </div>
 
-      {/* WEEKEND POLL */}
-      {activePoll && (
-        <section style={{ marginBottom: 28 }}>
-          <WeekendPoll poll={activePoll} allUsers={allUsers} />
-        </section>
-      )}
+   {/* WEEKEND POLLS */}
+   {activePolls.length > 0 && (
+   <section style={{ marginBottom: 28 }}>
+       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {activePolls.map((poll) => (
+        <WeekendPoll key={poll.id} poll={poll} allUsers={allUsers} />
+       ))}
+     </div>
+   </section>
+ )}
 
       {/* NEEDS YOUR RESPONSE */}
       {needsResponse.length > 0 && (
