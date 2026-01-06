@@ -1,0 +1,209 @@
+/* Golf Conditions Component Styles */
+
+.golf-conditions {
+  margin-top: 16px;
+}
+
+.golf-conditions-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  color: var(--color-text-secondary);
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Score Display */
+.conditions-score {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.score-emoji {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.score-details {
+  flex: 1;
+}
+
+.score-number {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.score-message {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Weather Details Grid */
+.weather-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.weather-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: 10px;
+}
+
+.weather-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.weather-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.weather-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.weather-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.weather-subvalue {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+/* Weather Description */
+.weather-description {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: 10px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.weather-summary {
+  font-size: 14px;
+  color: var(--color-text);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.weather-estimate {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* Conditions Breakdown */
+.conditions-breakdown {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.conditions-breakdown summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.conditions-breakdown summary:hover {
+  background: var(--color-bg-secondary);
+}
+
+.conditions-breakdown[open] summary {
+  margin-bottom: 12px;
+}
+
+.breakdown-content {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.breakdown-content p {
+  margin: 0 0 8px 0;
+}
+
+.breakdown-content ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.breakdown-content li {
+  margin-bottom: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .conditions-score {
+    padding: 16px;
+  }
+  
+  .score-emoji {
+    font-size: 40px;
+  }
+  
+  .score-number {
+    font-size: 28px;
+  }
+  
+  .score-message {
+    font-size: 14px;
+  }
+  
+  .weather-item {
+    padding: 10px;
+  }
+  
+  .weather-icon {
+    font-size: 20px;
+  }
+  
+  .weather-value {
+    font-size: 16px;
+  }
+}

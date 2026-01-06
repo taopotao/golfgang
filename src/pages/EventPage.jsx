@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { doc, onSnapshot, updateDoc, deleteDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../providers/AuthProvider";
+import '../components/RsvpStyles.css';
+import GolfConditions from '../components/GolfConditions';
 import { 
   showToast, 
   hapticFeedback, 
@@ -447,360 +449,411 @@ export default function EventPage() {
           )}
         </div>
 
+<GolfConditions event={event} />
+
         {/* RSVP Section */}
-        {!event.booked && (
-          <div className="card">
-            <h3 className="card-title">Are you in?</h3>
-            
-            {confirmedIds.length >= MAX_PLAYERS && !myStatus && (
-              <div className="toast toast-warning" style={{ marginBottom: 12 }}>
-                Group is full — you'll be on the reserve list
-              </div>
-            )}
+{!event.booked && (
+  <div className="card">
+    <h3 className="card-title" style={{ marginBottom: 20 }}>Are you in?</h3>
+    
+    {/* Warning if group is full */}
+    {confirmedIds.length >= MAX_PLAYERS && !myStatus && (
+      <div className="toast toast-warning">
+        ⚠️ Group is full — you'll be on the reserve list
+      </div>
+    )}
 
-            {/* Show current status if already responded */}
-            {myStatus && !showRsvpForm && (
-              <div className="current-rsvp">
-                <div className={`rsvp-status ${myStatus === 'available' ? 'rsvp-status-in' : 'rsvp-status-out'}`}>
-                  {myStatus === 'available' ? "✓ You're in!" : "✗ Can't make it"}
-                </div>
-                {myPreferences && myStatus === 'available' && (
-                  <div className="my-preferences">
-                    {myPreferences.timePreference && (
-                      <span className="pref-tag">⏰ {myPreferences.timePreference}</span>
-                    )}
-                    {myPreferences.cartPreference && (
-                      <span className="pref-tag">🛒 {myPreferences.cartPreference}</span>
-                    )}
-                    {myPreferences.formatPreference && (
-                      <span className="pref-tag">🎯 {myPreferences.formatPreference}</span>
-                    )}
-                  </div>
-                )}
-                <button 
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setShowRsvpForm(true)}
-                  style={{ marginTop: 12 }}
-                >
-                  Change Response
-                </button>
-              </div>
-            )}
-
-            {/* RSVP Form */}
-            {(!myStatus || showRsvpForm) && (
-              <div className="rsvp-form">
-                {/* Preferences */}
-                <div className="preferences-section">
-                  <h4 className="preferences-title">Your Preferences</h4>
-                  
-                  {/* Time Preference */}
-                  <div className="form-group">
-                    <label>Time Preference</label>
-                    <div className="toggle-group">
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.timePreference === 'AM' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, timePreference: rsvpPreferences.timePreference === 'AM' ? '' : 'AM' })}
-                      >
-                        ☀️ AM
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.timePreference === 'PM' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, timePreference: rsvpPreferences.timePreference === 'PM' ? '' : 'PM' })}
-                      >
-                        🌅 PM
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.timePreference === 'Any' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, timePreference: rsvpPreferences.timePreference === 'Any' ? '' : 'Any' })}
-                      >
-                        🤷 Any
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Cart Preference */}
-                  <div className="form-group">
-                    <label>Walk or Cart?</label>
-                    <div className="toggle-group">
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.cartPreference === 'Walk' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, cartPreference: rsvpPreferences.cartPreference === 'Walk' ? '' : 'Walk' })}
-                      >
-                        🚶 Walk
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.cartPreference === 'Cart' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, cartPreference: rsvpPreferences.cartPreference === 'Cart' ? '' : 'Cart' })}
-                      >
-                        🛒 Cart
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.cartPreference === 'Any' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, cartPreference: rsvpPreferences.cartPreference === 'Any' ? '' : 'Any' })}
-                      >
-                        🤷 Any
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Format Preference */}
-                  <div className="form-group">
-                    <label>Game Format</label>
-                    <div className="toggle-group">
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.formatPreference === 'Stroke' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, formatPreference: rsvpPreferences.formatPreference === 'Stroke' ? '' : 'Stroke' })}
-                      >
-                        🎯 Stroke
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.formatPreference === 'Scramble' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, formatPreference: rsvpPreferences.formatPreference === 'Scramble' ? '' : 'Scramble' })}
-                      >
-                        🤝 Scramble
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${rsvpPreferences.formatPreference === 'Any' ? 'active' : ''}`}
-                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, formatPreference: rsvpPreferences.formatPreference === 'Any' ? '' : 'Any' })}
-                      >
-                        🤷 Any
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Course Preference */}
-                  <div className="form-group">
-                    <label htmlFor="coursePreference">Course Preference</label>
-                    <input
-                      id="coursePreference"
-                      type="text"
-                      className="input"
-                      value={rsvpPreferences.coursePreference}
-                      onChange={(e) => setRsvpPreferences({ ...rsvpPreferences, coursePreference: e.target.value })}
-                      placeholder="e.g., Somewhere close to CBD"
-                    />
-                  </div>
-                </div>
-
-                {/* RSVP Buttons */}
-                <div className="rsvp-buttons">
-                  <button
-                    className="rsvp-btn rsvp-btn-available"
-                    onClick={() => handleRSVP('available')}
-                  >
-                    ✓ I'm in
-                  </button>
-                  <button
-                    className="rsvp-btn rsvp-btn-unavailable"
-                    onClick={() => handleRSVP('unavailable')}
-                  >
-                    ✗ Can't make it
-                  </button>
-                </div>
-
-                {showRsvpForm && (
-                  <button 
-                    className="btn btn-ghost btn-full"
-                    onClick={() => setShowRsvpForm(false)}
-                    style={{ marginTop: 12 }}
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Confirmed status for booked events */}
-        {event.booked && myStatus === 'available' && (
-          <div className="card card-success">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 20 }}>✓</span>
-              <span style={{ fontWeight: 600 }}>You're confirmed for this round</span>
-            </div>
-          </div>
-        )}
-
-        {/* Preferences Summary */}
-        {prefsSummary && confirmedIds.length > 0 && (
-          <div className="card">
-            <h3 className="card-title">Group Preferences</h3>
-            
-            <div className="prefs-summary">
-              {/* Time Summary */}
-              {Object.keys(prefsSummary.summary.time).length > 0 && (
-                <div className="prefs-row">
-                  <span className="prefs-label">⏰ Time:</span>
-                  <div className="prefs-values">
-                    {Object.entries(prefsSummary.summary.time).map(([pref, count]) => (
-                      <span key={pref} className="pref-chip">{pref} ({count})</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Cart Summary */}
-              {Object.keys(prefsSummary.summary.cart).length > 0 && (
-                <div className="prefs-row">
-                  <span className="prefs-label">🚶 Transport:</span>
-                  <div className="prefs-values">
-                    {Object.entries(prefsSummary.summary.cart).map(([pref, count]) => (
-                      <span key={pref} className="pref-chip">{pref} ({count})</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Format Summary */}
-              {Object.keys(prefsSummary.summary.format).length > 0 && (
-                <div className="prefs-row">
-                  <span className="prefs-label">🎯 Format:</span>
-                  <div className="prefs-values">
-                    {Object.entries(prefsSummary.summary.format).map(([pref, count]) => (
-                      <span key={pref} className="pref-chip">{pref} ({count})</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Course preferences (individual) */}
-              {prefsSummary.allPrefs.some(p => p.prefs?.coursePreference) && (
-                <div className="prefs-row prefs-row-courses">
-                  <span className="prefs-label">📍 Courses:</span>
-                  <div className="prefs-courses">
-                    {prefsSummary.allPrefs
-                      .filter(p => p.prefs?.coursePreference)
-                      .map(p => (
-                        <div key={p.uid} className="pref-course">
-                          <span className="pref-course-name">{p.name}:</span>
-                          <span className="pref-course-value">{p.prefs.coursePreference}</span>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Players List */}
-        <div className="card">
-          <h3 className="card-title">Players ({confirmedIds.length}/{MAX_PLAYERS})</h3>
-          
-          {confirmedIds.length === 0 ? (
-            <p className="text-secondary">No one has RSVP'd yet</p>
-          ) : (
-            <div className="player-list">
-              {confirmedIds.map((uid) => {
-                const name = getUserName(uid);
-                const style = getAvatarStyle(name);
-                const isMe = uid === user?.uid;
-                const playerPrefs = getResponsePreferences(responses[uid]);
-                
-                return (
-                  <div key={uid} className="player-item">
-                    <div className="player-info">
-                      <div 
-                        className="avatar"
-                        style={{ backgroundColor: style.bg, color: style.text }}
-                      >
-                        {getInitials(name)}
-                      </div>
-                      <div className="player-details">
-                        <span className="player-name">
-                          {name} {isMe && <span className="text-secondary">(you)</span>}
-                        </span>
-                        {playerPrefs && (
-                          <div className="player-prefs">
-                            {playerPrefs.timePreference && <span className="pref-mini">{playerPrefs.timePreference}</span>}
-                            {playerPrefs.cartPreference && <span className="pref-mini">{playerPrefs.cartPreference}</span>}
-                            {playerPrefs.formatPreference && <span className="pref-mini">{playerPrefs.formatPreference}</span>}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {isAdmin && !isMe && (
-                      <button 
-                        className="btn btn-ghost btn-sm btn-danger"
-                        onClick={() => removePlayer(uid)}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          
-          {unavailableIds.length > 0 && (
+    {/* Show current status if already responded */}
+    {myStatus && !showRsvpForm && (
+      <div className="current-rsvp">
+        <div className={`rsvp-status ${myStatus === 'available' ? 'rsvp-status-in' : 'rsvp-status-out'}`}>
+          {myStatus === 'available' ? (
             <>
-              <h4 className="card-subtitle">Can't make it</h4>
-              <div className="player-list player-list-unavailable">
-                {unavailableIds.map((uid) => {
-                  const name = getUserName(uid);
-                  const style = getAvatarStyle(name);
-                  return (
-                    <div key={uid} className="player-item">
-                      <div className="player-info">
-                        <div 
-                          className="avatar avatar-muted"
-                          style={{ backgroundColor: '#e5e7eb', color: '#6b7280' }}
-                        >
-                          {getInitials(name)}
-                        </div>
-                        <span className="player-name text-secondary">{name}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <span style={{ fontSize: 18 }}>✓</span>
+              <span>You're in!</span>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 18 }}>✗</span>
+              <span>Can't make it</span>
             </>
           )}
         </div>
+        
+        {/* Show user's preferences if they're available */}
+        {myPreferences && myStatus === 'available' && (
+          <div className="my-preferences">
+            {myPreferences.timePreference && (
+              <span className="pref-tag">⏰ {myPreferences.timePreference}</span>
+            )}
+            {myPreferences.cartPreference && (
+              <span className="pref-tag">🚶 {myPreferences.cartPreference}</span>
+            )}
+            {myPreferences.formatPreference && (
+              <span className="pref-tag">⛳ {myPreferences.formatPreference}</span>
+            )}
+          </div>
+        )}
+        
+        <button 
+          className="btn btn-ghost btn-sm"
+          onClick={() => setShowRsvpForm(true)}
+          style={{ marginTop: 16 }}
+        >
+          Change Response
+        </button>
+      </div>
+    )}
 
-        {/* Admin Actions */}
-        {canEdit && (
-          <div className="card">
-            <h3 className="card-title">Actions</h3>
-            <div className="admin-actions">
-              {!event.booked ? (
-                <button 
-                  className="btn btn-success btn-full"
-                  onClick={markBooked}
-                  disabled={confirmedIds.length === 0}
-                >
-                  ✓ Mark as Booked
-                </button>
-              ) : (
-                <button 
-                  className="btn btn-ghost btn-full"
-                  onClick={unmarkBooked}
-                >
-                  Remove Booking
-                </button>
-              )}
-              <button 
-                className="btn btn-danger btn-full"
-                onClick={deleteEvent}
+    {/* RSVP Form */}
+    {(!myStatus || showRsvpForm) && (
+      <div className="rsvp-form">
+        {/* Preferences Section */}
+        <div className="preferences-section">
+          <h4 className="preferences-title">Your Preferences (Optional)</h4>
+          
+          {/* Time Preference */}
+          <div className="form-group">
+            <label>⏰ Time Preference</label>
+            <div className="toggle-group">
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.timePreference === 'AM' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  timePreference: rsvpPreferences.timePreference === 'AM' ? '' : 'AM' 
+                })}
               >
-                Delete Event
+                ☀️ AM
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.timePreference === 'PM' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  timePreference: rsvpPreferences.timePreference === 'PM' ? '' : 'PM' 
+                })}
+              >
+                🌙 PM
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.timePreference === 'Any' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  timePreference: rsvpPreferences.timePreference === 'Any' ? '' : 'Any' 
+                })}
+              >
+                ⏱️ Any
               </button>
             </div>
           </div>
+
+          {/* Walk or Cart */}
+          <div className="form-group">
+            <label>🚶 Walk or Cart?</label>
+            <div className="toggle-group">
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.cartPreference === 'Walk' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  cartPreference: rsvpPreferences.cartPreference === 'Walk' ? '' : 'Walk' 
+                })}
+              >
+                🚶 Walk
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.cartPreference === 'Cart' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  cartPreference: rsvpPreferences.cartPreference === 'Cart' ? '' : 'Cart' 
+                })}
+              >
+                🛒 Cart
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.cartPreference === 'Any' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  cartPreference: rsvpPreferences.cartPreference === 'Any' ? '' : 'Any' 
+                })}
+              >
+                ✨ Any
+              </button>
+            </div>
+          </div>
+
+          {/* Game Format */}
+          <div className="form-group">
+            <label>⛳ Game Format</label>
+            <div className="toggle-group">
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.formatPreference === 'Stroke' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  formatPreference: rsvpPreferences.formatPreference === 'Stroke' ? '' : 'Stroke' 
+                })}
+              >
+                🎯 Stroke
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.formatPreference === 'Scramble' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  formatPreference: rsvpPreferences.formatPreference === 'Scramble' ? '' : 'Scramble' 
+                })}
+              >
+                🤝 Scramble
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${rsvpPreferences.formatPreference === 'Any' ? 'active' : ''}`}
+                onClick={() => setRsvpPreferences({ 
+                  ...rsvpPreferences, 
+                  formatPreference: rsvpPreferences.formatPreference === 'Any' ? '' : 'Any' 
+                })}
+              >
+                ✨ Any
+              </button>
+            </div>
+          </div>
+
+          {/* Course Preference */}
+          <div className="form-group">
+            <label>📍 Course Preference</label>
+            <input
+              type="text"
+              className="input"
+              value={rsvpPreferences.coursePreference}
+              onChange={(e) => setRsvpPreferences({ 
+                ...rsvpPreferences, 
+                coursePreference: e.target.value 
+              })}
+              placeholder="e.g., Somewhere close to CBD"
+            />
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="rsvp-actions">
+          <button
+            className="rsvp-action-btn btn-available"
+            onClick={() => handleRSVP('available')}
+          >
+            <span style={{ fontSize: 18 }}>✓</span>
+            <span>I'm in</span>
+          </button>
+          <button
+            className="rsvp-action-btn btn-unavailable"
+            onClick={() => handleRSVP('unavailable')}
+          >
+            <span style={{ fontSize: 18 }}>✗</span>
+            <span>Can't make it</span>
+          </button>
+        </div>
+
+        {/* Cancel button if editing existing response */}
+        {showRsvpForm && myStatus && (
+          <button
+            className="btn btn-ghost btn-full"
+            onClick={() => setShowRsvpForm(false)}
+            style={{ marginTop: 12 }}
+          >
+            Cancel
+          </button>
         )}
+      </div>
+    )}
+  </div>
+)}
+
+{/* Confirmed status for booked events */}
+{event.booked && myStatus === 'available' && (
+  <div className="card card-success">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 20 }}>✓</span>
+      <span style={{ fontWeight: 600 }}>You're confirmed for this round</span>
+    </div>
+  </div>
+)}
+
+{/* Players List - ALWAYS VISIBLE */}
+<div className="card">
+  <h3 className="card-title">Players ({confirmedIds.length}/{MAX_PLAYERS})</h3>
+  
+  {confirmedIds.length === 0 ? (
+    <p className="text-secondary">No one has RSVP'd yet</p>
+  ) : (
+    <div className="player-list">
+      {confirmedIds.map((uid) => {
+        const name = getUserName(uid);
+        const style = getAvatarStyle(name);
+        const isMe = uid === user?.uid;
+        const playerPrefs = getResponsePreferences(responses[uid]);
+        
+        return (
+          <div key={uid} className="player-item">
+            <div className="player-info">
+              <div 
+                className="avatar"
+                style={{ backgroundColor: style.bg, color: style.text }}
+              >
+                {getInitials(name)}
+              </div>
+              <div className="player-details">
+                <span className="player-name">
+                  {name} {isMe && <span className="text-secondary">(you)</span>}
+                </span>
+                {playerPrefs && (
+                  <div className="player-prefs">
+                    {playerPrefs.timePreference && <span className="pref-mini">{playerPrefs.timePreference}</span>}
+                    {playerPrefs.cartPreference && <span className="pref-mini">{playerPrefs.cartPreference}</span>}
+                    {playerPrefs.formatPreference && <span className="pref-mini">{playerPrefs.formatPreference}</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+            {isAdmin && !isMe && (
+              <button 
+                className="btn btn-ghost btn-sm btn-danger"
+                onClick={() => removePlayer(uid)}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  )}
+  
+  {/* Unavailable Players */}
+  {unavailableIds.length > 0 && (
+    <>
+      <h4 className="card-subtitle" style={{ marginTop: 20, marginBottom: 12, fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+        Can't make it
+      </h4>
+      <div className="player-list player-list-unavailable">
+        {unavailableIds.map((uid) => {
+          const name = getUserName(uid);
+          const style = getAvatarStyle(name);
+          return (
+            <div key={uid} className="player-item">
+              <div className="player-info">
+                <div 
+                  className="avatar avatar-muted"
+                  style={{ backgroundColor: '#e5e7eb', color: '#6b7280' }}
+                >
+                  {getInitials(name)}
+                </div>
+                <span className="player-name text-secondary">{name}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  )}
+</div>
+
+{/* Group Preferences Summary */}
+{prefsSummary && confirmedIds.length > 0 && (
+  <div className="card">
+    <h3 className="card-title">Group Preferences</h3>
+    
+    <div className="prefs-summary">
+      {/* Time Summary */}
+      {Object.keys(prefsSummary.summary.time).length > 0 && (
+        <div className="prefs-row">
+          <span className="prefs-label">⏰ Time:</span>
+          <div className="prefs-values">
+            {Object.entries(prefsSummary.summary.time).map(([pref, count]) => (
+              <span key={pref} className="pref-chip">{pref} ({count})</span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Cart Summary */}
+      {Object.keys(prefsSummary.summary.cart).length > 0 && (
+        <div className="prefs-row">
+          <span className="prefs-label">🚶 Transport:</span>
+          <div className="prefs-values">
+            {Object.entries(prefsSummary.summary.cart).map(([pref, count]) => (
+              <span key={pref} className="pref-chip">{pref} ({count})</span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Format Summary */}
+      {Object.keys(prefsSummary.summary.format).length > 0 && (
+        <div className="prefs-row">
+          <span className="prefs-label">⛳ Format:</span>
+          <div className="prefs-values">
+            {Object.entries(prefsSummary.summary.format).map(([pref, count]) => (
+              <span key={pref} className="pref-chip">{pref} ({count})</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Course preferences (individual) */}
+      {prefsSummary.allPrefs.some(p => p.prefs?.coursePreference) && (
+        <div className="prefs-row prefs-row-courses">
+          <span className="prefs-label">📍 Courses:</span>
+          <div className="prefs-courses">
+            {prefsSummary.allPrefs
+              .filter(p => p.prefs?.coursePreference)
+              .map(p => (
+                <div key={p.uid} className="pref-course">
+                  <span className="pref-course-name">{p.name}:</span>
+                  <span className="pref-course-value">{p.prefs.coursePreference}</span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{/* Admin Actions */}
+{canEdit && (
+  <div className="card">
+    <h3 className="card-title">Actions</h3>
+    <div className="admin-actions">
+      {!event.booked ? (
+        <button 
+          className="btn btn-success btn-full"
+          onClick={markBooked}
+          disabled={confirmedIds.length === 0}
+        >
+          ✓ Mark as Booked
+        </button>
+      ) : (
+        <button 
+          className="btn btn-ghost btn-full"
+          onClick={unmarkBooked}
+        >
+          Remove Booking
+        </button>
+      )}
+      <button 
+        className="btn btn-danger btn-full"
+        onClick={deleteEvent}
+      >
+        Delete Event
+      </button>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
