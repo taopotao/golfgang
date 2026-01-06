@@ -22,6 +22,13 @@ const getResponseStatus = (response) => {
   return response.status;
 };
 
+// Helper to get preferences from response
+const getResponsePreferences = (response) => {
+  if (!response) return null;
+  if (typeof response === 'string') return null;
+  return response.preferences || null;
+};
+
 export default function EventPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -32,12 +39,21 @@ export default function EventPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showRsvpForm, setShowRsvpForm] = useState(false);
   
   // Edit form state
   const [form, setForm] = useState({
     tee: "",
     courseName: "",
     notes: "",
+  });
+
+  // RSVP preferences state
+  const [rsvpPreferences, setRsvpPreferences] = useState({
+    timePreference: "",
+    cartPreference: "",
+    formatPreference: "",
+    coursePreference: "",
   });
 
   // Load event
@@ -58,6 +74,22 @@ export default function EventPage() {
     return () => unsub();
   }, [id]);
 
+  // Load user's existing preferences when event loads
+  useEffect(() => {
+    if (event && user) {
+      const myResponse = event.responses?.[user.uid];
+      const myPrefs = getResponsePreferences(myResponse);
+      if (myPrefs) {
+        setRsvpPreferences({
+          timePreference: myPrefs.timePreference || "",
+          cartPreference: myPrefs.cartPreference || "",
+          formatPreference: myPrefs.formatPreference || "",
+          coursePreference: myPrefs.coursePreference || "",
+        });
+      }
+    }
+  }, [event, user]);
+
   // Load users
   useEffect(() => {
     async function loadUsers() {
@@ -76,6 +108,7 @@ export default function EventPage() {
   // Get responses
   const responses = event?.responses || {};
   const myStatus = user ? getResponseStatus(responses[user.uid]) : null;
+  const myPreferences = user ? getResponsePreferences(responses[user.uid]) : null;
   
   // Separate confirmed and unavailable
   const confirmedIds = Object.entries(responses)
@@ -90,7 +123,7 @@ export default function EventPage() {
   const isProposer = user?.uid === event?.proposedBy;
   const canEdit = isAdmin || isProposer;
 
-  // RSVP handler
+  // RSVP handler with preferences
   const handleRSVP = async (status) => {
     if (!event || !user) return;
     hapticFeedback('medium');
@@ -104,6 +137,12 @@ export default function EventPage() {
       } else {
         newResponses[user.uid] = {
           status,
+          preferences: status === 'available' ? {
+            timePreference: rsvpPreferences.timePreference || null,
+            cartPreference: rsvpPreferences.cartPreference || null,
+            formatPreference: rsvpPreferences.formatPreference || null,
+            coursePreference: rsvpPreferences.coursePreference || null,
+          } : null,
           updatedAt: new Date().toISOString(),
         };
       }
@@ -112,8 +151,10 @@ export default function EventPage() {
       
       if (status === 'available') {
         showToast("You're in! ⛳", 'success');
+        setShowRsvpForm(false);
       } else if (status === 'unavailable') {
         showToast("Response saved", 'default');
+        setShowRsvpForm(false);
       }
     } catch (err) {
       console.error("Error updating RSVP:", err);
@@ -220,7 +261,7 @@ export default function EventPage() {
     const playerNames = confirmedIds.map(uid => getUserName(uid)).join(', ');
     
     let msg = `⛳ Golf - ${event.booked ? "Booked" : "Proposed"}!\n`;
-    if (dateStr) msg += `📅 ${dateStr}\n`;
+    msg += `📅 ${event.title || dateStr}\n`;
     if (event.tee) msg += `🕐 ${event.tee}\n`;
     if (event.courseName) msg += `📍 ${event.courseName}\n`;
     if (playerNames) msg += `🏌️ ${playerNames}\n`;
@@ -237,6 +278,40 @@ export default function EventPage() {
     } catch {
       showToast("Could not copy", 'error');
     }
+  };
+
+  // Summarize preferences
+  const getPreferencesSummary = () => {
+    const allPrefs = Object.entries(responses)
+      .filter(([_, r]) => getResponseStatus(r) === 'available')
+      .map(([uid, r]) => ({
+        uid,
+        name: getUserName(uid),
+        prefs: getResponsePreferences(r),
+      }))
+      .filter(p => p.prefs);
+
+    if (allPrefs.length === 0) return null;
+
+    const summary = {
+      time: {},
+      cart: {},
+      format: {},
+    };
+
+    allPrefs.forEach(p => {
+      if (p.prefs.timePreference) {
+        summary.time[p.prefs.timePreference] = (summary.time[p.prefs.timePreference] || 0) + 1;
+      }
+      if (p.prefs.cartPreference) {
+        summary.cart[p.prefs.cartPreference] = (summary.cart[p.prefs.cartPreference] || 0) + 1;
+      }
+      if (p.prefs.formatPreference) {
+        summary.format[p.prefs.formatPreference] = (summary.format[p.prefs.formatPreference] || 0) + 1;
+      }
+    });
+
+    return { summary, allPrefs };
   };
 
   if (loading) {
@@ -271,6 +346,7 @@ export default function EventPage() {
 
   const date = event.date?.toDate?.();
   const dateStr = formatEventDate(date);
+  const prefsSummary = getPreferencesSummary();
 
   return (
     <div className="page">
@@ -375,25 +451,174 @@ export default function EventPage() {
         {!event.booked && (
           <div className="card">
             <h3 className="card-title">Are you in?</h3>
+            
             {confirmedIds.length >= MAX_PLAYERS && !myStatus && (
               <div className="toast toast-warning" style={{ marginBottom: 12 }}>
                 Group is full — you'll be on the reserve list
               </div>
             )}
-            <div className="rsvp-buttons">
-              <button
-                className={`rsvp-btn rsvp-btn-available ${myStatus === 'available' ? 'active' : ''}`}
-                onClick={() => handleRSVP(myStatus === 'available' ? null : 'available')}
-              >
-                ✓ I'm in
-              </button>
-              <button
-                className={`rsvp-btn rsvp-btn-unavailable ${myStatus === 'unavailable' ? 'active' : ''}`}
-                onClick={() => handleRSVP(myStatus === 'unavailable' ? null : 'unavailable')}
-              >
-                ✗ Can't make it
-              </button>
-            </div>
+
+            {/* Show current status if already responded */}
+            {myStatus && !showRsvpForm && (
+              <div className="current-rsvp">
+                <div className={`rsvp-status ${myStatus === 'available' ? 'rsvp-status-in' : 'rsvp-status-out'}`}>
+                  {myStatus === 'available' ? "✓ You're in!" : "✗ Can't make it"}
+                </div>
+                {myPreferences && myStatus === 'available' && (
+                  <div className="my-preferences">
+                    {myPreferences.timePreference && (
+                      <span className="pref-tag">⏰ {myPreferences.timePreference}</span>
+                    )}
+                    {myPreferences.cartPreference && (
+                      <span className="pref-tag">🛒 {myPreferences.cartPreference}</span>
+                    )}
+                    {myPreferences.formatPreference && (
+                      <span className="pref-tag">🎯 {myPreferences.formatPreference}</span>
+                    )}
+                  </div>
+                )}
+                <button 
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setShowRsvpForm(true)}
+                  style={{ marginTop: 12 }}
+                >
+                  Change Response
+                </button>
+              </div>
+            )}
+
+            {/* RSVP Form */}
+            {(!myStatus || showRsvpForm) && (
+              <div className="rsvp-form">
+                {/* Preferences */}
+                <div className="preferences-section">
+                  <h4 className="preferences-title">Your Preferences</h4>
+                  
+                  {/* Time Preference */}
+                  <div className="form-group">
+                    <label>Time Preference</label>
+                    <div className="toggle-group">
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.timePreference === 'AM' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, timePreference: rsvpPreferences.timePreference === 'AM' ? '' : 'AM' })}
+                      >
+                        ☀️ AM
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.timePreference === 'PM' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, timePreference: rsvpPreferences.timePreference === 'PM' ? '' : 'PM' })}
+                      >
+                        🌅 PM
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.timePreference === 'Any' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, timePreference: rsvpPreferences.timePreference === 'Any' ? '' : 'Any' })}
+                      >
+                        🤷 Any
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Cart Preference */}
+                  <div className="form-group">
+                    <label>Walk or Cart?</label>
+                    <div className="toggle-group">
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.cartPreference === 'Walk' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, cartPreference: rsvpPreferences.cartPreference === 'Walk' ? '' : 'Walk' })}
+                      >
+                        🚶 Walk
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.cartPreference === 'Cart' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, cartPreference: rsvpPreferences.cartPreference === 'Cart' ? '' : 'Cart' })}
+                      >
+                        🛒 Cart
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.cartPreference === 'Any' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, cartPreference: rsvpPreferences.cartPreference === 'Any' ? '' : 'Any' })}
+                      >
+                        🤷 Any
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Format Preference */}
+                  <div className="form-group">
+                    <label>Game Format</label>
+                    <div className="toggle-group">
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.formatPreference === 'Stroke' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, formatPreference: rsvpPreferences.formatPreference === 'Stroke' ? '' : 'Stroke' })}
+                      >
+                        🎯 Stroke
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.formatPreference === 'Scramble' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, formatPreference: rsvpPreferences.formatPreference === 'Scramble' ? '' : 'Scramble' })}
+                      >
+                        🤝 Scramble
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${rsvpPreferences.formatPreference === 'Any' ? 'active' : ''}`}
+                        onClick={() => setRsvpPreferences({ ...rsvpPreferences, formatPreference: rsvpPreferences.formatPreference === 'Any' ? '' : 'Any' })}
+                      >
+                        🤷 Any
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Course Preference */}
+                  <div className="form-group">
+                    <label htmlFor="coursePreference">Course Preference</label>
+                    <input
+                      id="coursePreference"
+                      type="text"
+                      className="input"
+                      value={rsvpPreferences.coursePreference}
+                      onChange={(e) => setRsvpPreferences({ ...rsvpPreferences, coursePreference: e.target.value })}
+                      placeholder="e.g., Somewhere close to CBD"
+                    />
+                  </div>
+                </div>
+
+                {/* RSVP Buttons */}
+                <div className="rsvp-buttons">
+                  <button
+                    className="rsvp-btn rsvp-btn-available"
+                    onClick={() => handleRSVP('available')}
+                  >
+                    ✓ I'm in
+                  </button>
+                  <button
+                    className="rsvp-btn rsvp-btn-unavailable"
+                    onClick={() => handleRSVP('unavailable')}
+                  >
+                    ✗ Can't make it
+                  </button>
+                </div>
+
+                {showRsvpForm && (
+                  <button 
+                    className="btn btn-ghost btn-full"
+                    onClick={() => setShowRsvpForm(false)}
+                    style={{ marginTop: 12 }}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -403,6 +628,69 @@ export default function EventPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 20 }}>✓</span>
               <span style={{ fontWeight: 600 }}>You're confirmed for this round</span>
+            </div>
+          </div>
+        )}
+
+        {/* Preferences Summary */}
+        {prefsSummary && confirmedIds.length > 0 && (
+          <div className="card">
+            <h3 className="card-title">Group Preferences</h3>
+            
+            <div className="prefs-summary">
+              {/* Time Summary */}
+              {Object.keys(prefsSummary.summary.time).length > 0 && (
+                <div className="prefs-row">
+                  <span className="prefs-label">⏰ Time:</span>
+                  <div className="prefs-values">
+                    {Object.entries(prefsSummary.summary.time).map(([pref, count]) => (
+                      <span key={pref} className="pref-chip">{pref} ({count})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Cart Summary */}
+              {Object.keys(prefsSummary.summary.cart).length > 0 && (
+                <div className="prefs-row">
+                  <span className="prefs-label">🚶 Transport:</span>
+                  <div className="prefs-values">
+                    {Object.entries(prefsSummary.summary.cart).map(([pref, count]) => (
+                      <span key={pref} className="pref-chip">{pref} ({count})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Format Summary */}
+              {Object.keys(prefsSummary.summary.format).length > 0 && (
+                <div className="prefs-row">
+                  <span className="prefs-label">🎯 Format:</span>
+                  <div className="prefs-values">
+                    {Object.entries(prefsSummary.summary.format).map(([pref, count]) => (
+                      <span key={pref} className="pref-chip">{pref} ({count})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Course preferences (individual) */}
+              {prefsSummary.allPrefs.some(p => p.prefs?.coursePreference) && (
+                <div className="prefs-row prefs-row-courses">
+                  <span className="prefs-label">📍 Courses:</span>
+                  <div className="prefs-courses">
+                    {prefsSummary.allPrefs
+                      .filter(p => p.prefs?.coursePreference)
+                      .map(p => (
+                        <div key={p.uid} className="pref-course">
+                          <span className="pref-course-name">{p.name}:</span>
+                          <span className="pref-course-value">{p.prefs.coursePreference}</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -419,6 +707,7 @@ export default function EventPage() {
                 const name = getUserName(uid);
                 const style = getAvatarStyle(name);
                 const isMe = uid === user?.uid;
+                const playerPrefs = getResponsePreferences(responses[uid]);
                 
                 return (
                   <div key={uid} className="player-item">
@@ -429,9 +718,18 @@ export default function EventPage() {
                       >
                         {getInitials(name)}
                       </div>
-                      <span className="player-name">
-                        {name} {isMe && <span className="text-secondary">(you)</span>}
-                      </span>
+                      <div className="player-details">
+                        <span className="player-name">
+                          {name} {isMe && <span className="text-secondary">(you)</span>}
+                        </span>
+                        {playerPrefs && (
+                          <div className="player-prefs">
+                            {playerPrefs.timePreference && <span className="pref-mini">{playerPrefs.timePreference}</span>}
+                            {playerPrefs.cartPreference && <span className="pref-mini">{playerPrefs.cartPreference}</span>}
+                            {playerPrefs.formatPreference && <span className="pref-mini">{playerPrefs.formatPreference}</span>}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {isAdmin && !isMe && (
                       <button 

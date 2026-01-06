@@ -993,3 +993,214 @@ textarea.input {
     flex: 1;
   }
 }
+/* =========================================================
+   Preferences Styles - Add to your index.css
+   ========================================================= */
+
+/* ---------- Preferences Section ---------- */
+.preferences-section {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.preferences-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-4) 0;
+}
+
+/* ---------- Toggle Groups ---------- */
+.toggle-group {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.toggle-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 12px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.toggle-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg);
+}
+
+.toggle-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+/* ---------- Current RSVP Status ---------- */
+.current-rsvp {
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.rsvp-status {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  display: inline-block;
+}
+
+.rsvp-status-in {
+  background: var(--color-success-soft);
+  color: #065f46;
+}
+
+.rsvp-status-out {
+  background: var(--color-danger-soft);
+  color: #991b1b;
+}
+
+.my-preferences {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.pref-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-border-light);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ---------- RSVP Form ---------- */
+.rsvp-form {
+  margin-top: var(--space-3);
+}
+
+/* ---------- Preferences Summary ---------- */
+.prefs-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.prefs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.prefs-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.prefs-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pref-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.prefs-row-courses {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.prefs-courses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.pref-course {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.pref-course-name {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.pref-course-value {
+  color: var(--color-text);
+}
+
+/* ---------- Player Details with Prefs ---------- */
+.player-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-prefs {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.pref-mini {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--color-border-light);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Responsive for small screens ---------- */
+@media (max-width: 400px) {
+  .toggle-group {
+    flex-direction: column;
+  }
+  
+  .toggle-btn {
+    min-width: 100%;
+  }
+  
+  .prefs-row {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .prefs-label {
+    min-width: auto;
+  }
+}

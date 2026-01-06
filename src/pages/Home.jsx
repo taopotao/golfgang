@@ -14,13 +14,23 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
   
+  // Form state with preferences
   const [form, setForm] = useState({
     date: "",
-    tee: "08:00",
+    tee: "",
     courseName: "",
     notes: "",
   });
 
+  // Proposer preferences
+  const [preferences, setPreferences] = useState({
+    timePreference: "",
+    cartPreference: "",
+    formatPreference: "",
+    coursePreference: "",
+  });
+
+  // Load events
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "events"), (snapshot) => {
       const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -30,6 +40,7 @@ export default function Home() {
     return () => unsub();
   }, []);
 
+  // Load users
   useEffect(() => {
     async function loadUsers() {
       const snap = await getDocs(collection(db, "users"));
@@ -38,6 +49,7 @@ export default function Home() {
     loadUsers();
   }, []);
 
+  // Format date as title
   const formatDateAsTitle = (dateString) => {
     if (!dateString) return "";
     const [year, month, day] = dateString.split("-").map(Number);
@@ -49,9 +61,10 @@ export default function Home() {
       const v = n % 100;
       return n + (s[(v - 20) % 10] || s[v] || s[0]);
     };
-    return `⛳ ${weekday} ${ordinal(day)} ${monthName}`;
+    return `${weekday} ${ordinal(day)} ${monthName}`;
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -70,7 +83,7 @@ export default function Home() {
       await addDoc(collection(db, "events"), {
         title: formatDateAsTitle(form.date),
         date: Timestamp.fromDate(eventDate),
-        tee: form.tee,
+        tee: form.tee || null,
         courseName: form.courseName || null,
         notes: form.notes || null,
         proposedBy: user.uid,
@@ -78,12 +91,22 @@ export default function Home() {
         booked: false,
         createdAt: Timestamp.now(),
         responses: {
-          [user.uid]: "available",
+          [user.uid]: {
+            status: "available",
+            preferences: {
+              timePreference: preferences.timePreference || null,
+              cartPreference: preferences.cartPreference || null,
+              formatPreference: preferences.formatPreference || null,
+              coursePreference: preferences.coursePreference || null,
+            },
+            updatedAt: new Date().toISOString(),
+          },
         },
       });
 
       showToast("Round proposed! ⛳", "success");
-      setForm({ date: "", tee: "08:00", courseName: "", notes: "" });
+      setForm({ date: "", tee: "", courseName: "", notes: "" });
+      setPreferences({ timePreference: "", cartPreference: "", formatPreference: "", coursePreference: "" });
       setShowForm(false);
     } catch (err) {
       console.error("Error creating event:", err);
@@ -93,6 +116,7 @@ export default function Home() {
     }
   };
 
+  // Filter and sort events
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   
@@ -111,6 +135,7 @@ export default function Home() {
     .sort((a, b) => b.date.toMillis() - a.date.toMillis())
     .slice(0, 5);
 
+  // Get min date (tomorrow)
   const getMinDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -133,47 +158,51 @@ export default function Home() {
   return (
     <div className="page">
       <div className="page-content">
+        {/* Header */}
         <div className="page-header">
           <h1 className="page-title">Upcoming Rounds</h1>
           <button 
             className="btn btn-primary"
             onClick={() => setShowForm(!showForm)}
           >
-            {showForm ? "Cancel" : "+ Propose Round"}
+            {showForm ? "Cancel" : "+ Propose"}
           </button>
         </div>
 
+        {/* Propose Form */}
         {showForm && (
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ marginTop: 0, marginBottom: 16 }}>Propose a Round</h3>
             <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="date">Date</label>
-                  <input
-                    id="date"
-                    type="date"
-                    className="input"
-                    value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
-                    min={getMinDate()}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="tee">Tee Time</label>
-                  <input
-                    id="tee"
-                    type="time"
-                    className="input"
-                    value={form.tee}
-                    onChange={(e) => setForm({ ...form, tee: e.target.value })}
-                  />
-                </div>
+              {/* Date */}
+              <div className="form-group">
+                <label htmlFor="date">Date *</label>
+                <input
+                  id="date"
+                  type="date"
+                  className="input"
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  min={getMinDate()}
+                  required
+                />
+              </div>
+
+              {/* Tee Time (optional - can be decided later) */}
+              <div className="form-group">
+                <label htmlFor="tee">Tee Time (if known)</label>
+                <input
+                  id="tee"
+                  type="time"
+                  className="input"
+                  value={form.tee}
+                  onChange={(e) => setForm({ ...form, tee: e.target.value })}
+                />
               </div>
               
+              {/* Course (optional) */}
               <div className="form-group">
-                <label htmlFor="course">Course (optional)</label>
+                <label htmlFor="course">Course (if known)</label>
                 <input
                   id="course"
                   type="text"
@@ -183,7 +212,110 @@ export default function Home() {
                   placeholder="e.g., Royal Melbourne"
                 />
               </div>
+
+              {/* Preferences Section */}
+              <div className="preferences-section">
+                <h4 className="preferences-title">Your Preferences</h4>
+                
+                {/* Time Preference */}
+                <div className="form-group">
+                  <label>Time Preference</label>
+                  <div className="toggle-group">
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.timePreference === 'AM' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, timePreference: preferences.timePreference === 'AM' ? '' : 'AM' })}
+                    >
+                      ☀️ AM
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.timePreference === 'PM' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, timePreference: preferences.timePreference === 'PM' ? '' : 'PM' })}
+                    >
+                      🌅 PM
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.timePreference === 'Any' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, timePreference: preferences.timePreference === 'Any' ? '' : 'Any' })}
+                    >
+                      🤷 Any
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cart Preference */}
+                <div className="form-group">
+                  <label>Walk or Cart?</label>
+                  <div className="toggle-group">
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.cartPreference === 'Walk' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, cartPreference: preferences.cartPreference === 'Walk' ? '' : 'Walk' })}
+                    >
+                      🚶 Walk
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.cartPreference === 'Cart' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, cartPreference: preferences.cartPreference === 'Cart' ? '' : 'Cart' })}
+                    >
+                      🛒 Cart
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.cartPreference === 'Any' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, cartPreference: preferences.cartPreference === 'Any' ? '' : 'Any' })}
+                    >
+                      🤷 Any
+                    </button>
+                  </div>
+                </div>
+
+                {/* Format Preference */}
+                <div className="form-group">
+                  <label>Game Format</label>
+                  <div className="toggle-group">
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.formatPreference === 'Stroke' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, formatPreference: preferences.formatPreference === 'Stroke' ? '' : 'Stroke' })}
+                    >
+                      🎯 Stroke
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.formatPreference === 'Scramble' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, formatPreference: preferences.formatPreference === 'Scramble' ? '' : 'Scramble' })}
+                    >
+                      🤝 Scramble
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${preferences.formatPreference === 'Any' ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, formatPreference: preferences.formatPreference === 'Any' ? '' : 'Any' })}
+                    >
+                      🤷 Any
+                    </button>
+                  </div>
+                </div>
+
+                {/* Course Preference (free text) */}
+                <div className="form-group">
+                  <label htmlFor="coursePreference">Course Preference</label>
+                  <input
+                    id="coursePreference"
+                    type="text"
+                    className="input"
+                    value={preferences.coursePreference}
+                    onChange={(e) => setPreferences({ ...preferences, coursePreference: e.target.value })}
+                    placeholder="e.g., Somewhere close to CBD"
+                  />
+                </div>
+              </div>
               
+              {/* Notes */}
               <div className="form-group">
                 <label htmlFor="notes">Notes (optional)</label>
                 <textarea
@@ -207,6 +339,7 @@ export default function Home() {
           </div>
         )}
 
+        {/* Upcoming Events */}
         {upcomingEvents.length === 0 ? (
           <div className="card empty-state">
             <div className="empty-state-icon">🏌️</div>
@@ -221,6 +354,7 @@ export default function Home() {
           </div>
         )}
 
+        {/* Past Events */}
         {pastEvents.length > 0 && (
           <>
             <div className="section-divider">
