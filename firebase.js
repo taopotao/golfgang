@@ -2,8 +2,6 @@ import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
-// TODO: Replace with your Firebase config from Firebase Console
-// Go to: Firebase Console > Project Settings > Your Apps > Web App
 const firebaseConfig = {
   apiKey: "AIzaSyCTDtoGl-VnlE33xKZsRocfstdnCSZMyek",
   authDomain: "golfgang-f00e3.firebaseapp.com",

@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, Timestamp, getDocs } from "firebase/firestore";
-<<<<<<< HEAD
-import { db } from "../../firebase";
-=======
 import { db } from "../firebase";
->>>>>>> 6d9e4c8 (update)
 import { useAuth } from "../providers/AuthProvider";
 import EventCard from "../components/EventCard";
 import { showToast, hapticFeedback } from "../utils/helpers";
@@ -18,7 +14,6 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
   
-  // Form state
   const [form, setForm] = useState({
     date: "",
     tee: "08:00",
@@ -26,7 +21,6 @@ export default function Home() {
     notes: "",
   });
 
-  // Load events
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "events"), (snapshot) => {
       const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -36,7 +30,6 @@ export default function Home() {
     return () => unsub();
   }, []);
 
-  // Load users
   useEffect(() => {
     async function loadUsers() {
       const snap = await getDocs(collection(db, "users"));
@@ -45,7 +38,6 @@ export default function Home() {
     loadUsers();
   }, []);
 
-  // Format date as title
   const formatDateAsTitle = (dateString) => {
     if (!dateString) return "";
     const [year, month, day] = dateString.split("-").map(Number);
@@ -60,7 +52,6 @@ export default function Home() {
     return `⛳ ${weekday} ${ordinal(day)} ${monthName}`;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -87,7 +78,7 @@ export default function Home() {
         booked: false,
         createdAt: Timestamp.now(),
         responses: {
-          [user.uid]: "available", // Proposer is automatically in
+          [user.uid]: "available",
         },
       });
 
@@ -102,7 +93,6 @@ export default function Home() {
     }
   };
 
-  // Filter and sort events
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   
@@ -121,7 +111,6 @@ export default function Home() {
     .sort((a, b) => b.date.toMillis() - a.date.toMillis())
     .slice(0, 5);
 
-  // Get min date (tomorrow)
   const getMinDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -144,7 +133,6 @@ export default function Home() {
   return (
     <div className="page">
       <div className="page-content">
-        {/* Header */}
         <div className="page-header">
           <h1 className="page-title">Upcoming Rounds</h1>
           <button 
@@ -155,7 +143,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Propose Form */}
         {showForm && (
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ marginTop: 0, marginBottom: 16 }}>Propose a Round</h3>
@@ -220,7 +207,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Upcoming Events */}
         {upcomingEvents.length === 0 ? (
           <div className="card empty-state">
             <div className="empty-state-icon">🏌️</div>
@@ -235,7 +221,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Past Events */}
         {pastEvents.length > 0 && (
           <>
             <div className="section-divider">

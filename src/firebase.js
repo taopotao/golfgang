@@ -9,7 +9,7 @@ const firebaseConfig = {
   storageBucket: "golfgang-f00e3.firebasestorage.app",
   messagingSenderId: "787603935494",
   appId: "1:787603935494:web:82f634dc12cdd3b42cce87"
-}
+};
 
 const app = initializeApp(firebaseConfig)
 

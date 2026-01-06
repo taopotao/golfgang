@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
-<<<<<<< HEAD
-import { auth, db } from "../../firebase";
-=======
 import { auth, db } from "../firebase";
->>>>>>> 6d9e4c8 (update)
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function Login() {
@@ -24,7 +20,6 @@ export default function Login() {
     try {
       let emailToUse = identifier.trim();
 
-      // If not an email, look up username
       if (!identifier.includes("@")) {
         const q = query(
           collection(db, "users"),
