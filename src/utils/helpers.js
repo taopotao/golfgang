@@ -105,16 +105,39 @@ export function formatShortDate(date) {
   });
 }
 
-// Build Google Calendar URL
+// Build Google Calendar URL with custom title format
 export function buildGoogleCalendarUrl(event, eventUrl) {
   const date = event.date?.toDate?.() || new Date();
   const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
   
-  const title = encodeURIComponent(event.title || 'Golf Round');
+  // Build title in format: ⛳ 2:22pm - North Turramurra Golf Course
+  let title = '⛳';
+  
+  // Add tee time if available
+  if (event.tee) {
+    // Convert 24hr time (14:22) to 12hr format (2:22pm)
+    const [hours, minutes] = event.tee.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'pm' : 'am';
+    const displayHour = hour % 12 || 12; // Convert 0 to 12, keep 1-11
+    title += ` ${displayHour}:${minutes}${ampm}`;
+  }
+  
+  // Add course name if available (with separator if we have time)
+  if (event.courseName) {
+    if (event.tee) {
+      title += ' - '; // Add separator only if we have both time and course
+    } else {
+      title += ' '; // Just space if only course
+    }
+    title += event.courseName;
+  }
+  
+  const encodedTitle = encodeURIComponent(title);
   const location = encodeURIComponent(event.courseName || '');
   const details = encodeURIComponent(
     `${event.notes || ''}\n\nEvent details: ${eventUrl}`
   );
   
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateStr}/${dateStr}&location=${location}&details=${details}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodedTitle}&dates=${dateStr}/${dateStr}&location=${location}&details=${details}`;
 }

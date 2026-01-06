@@ -3,11 +3,20 @@ import { collection, onSnapshot, addDoc, Timestamp, getDocs } from "firebase/fir
 import { db } from "../firebase";
 import { useAuth } from "../providers/AuthProvider";
 import EventCard from "../components/EventCard";
-import { showToast, hapticFeedback } from "../utils/helpers";
+import { 
+  showToast, 
+  hapticFeedback,
+  buildGoogleCalendarUrl
+} from "../utils/helpers";
 
 export default function Home() {
   const { user, profile } = useAuth();
   
+    const getEventCalendarUrl = (event) => {
+    const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : import.meta.env.BASE_URL);
+    const eventUrl = `${baseUrl}/event/${event.id}`;
+    return buildGoogleCalendarUrl(event, eventUrl);
+  };
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -14,6 +14,7 @@ import {
   getAvatarStyle,
   buildGoogleCalendarUrl 
 } from "../utils/helpers";
+import CourseSearch from '../components/CourseSearch';
 
 const MAX_PLAYERS = 4;
 
@@ -47,6 +48,7 @@ export default function EventPage() {
   const [form, setForm] = useState({
     tee: "",
     courseName: "",
+    coursePlaceId: "",
     notes: "",
   });
 
@@ -66,6 +68,7 @@ export default function EventPage() {
         setForm({
           tee: snap.data().tee || "",
           courseName: snap.data().courseName || "",
+          coursePlaceId: snap.data().coursePlaceId || "",
           notes: snap.data().notes || "",
         });
       } else {
@@ -213,26 +216,27 @@ export default function EventPage() {
   };
 
   // Save edits
-  const saveEdits = async () => {
-    if (!event) return;
-    setSaving(true);
-    
-    try {
-      const ref = doc(db, "events", event.id);
-      await updateDoc(ref, {
-        tee: form.tee || null,
-        courseName: form.courseName || null,
-        notes: form.notes || null,
-      });
-      setEditing(false);
-      showToast("Changes saved", 'success');
-    } catch (err) {
-      console.error("Error saving:", err);
-      showToast("Failed to save", 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+      const saveEdits = async () => {
+      if (!event) return;
+      setSaving(true);
+      
+      try {
+        const ref = doc(db, "events", event.id);
+        await updateDoc(ref, {
+          tee: form.tee || null,
+          courseName: form.courseName || null,
+          coursePlaceId: form.coursePlaceId || null,  // ✨ ADD THIS
+          notes: form.notes || null,
+        });
+        setEditing(false);
+        showToast("Changes saved", 'success');
+      } catch (err) {
+        console.error("Error saving:", err);
+        showToast("Failed to save", 'error');
+      } finally {
+        setSaving(false);
+      }
+    };
 
   // Delete event
   const deleteEvent = async () => {
@@ -281,6 +285,15 @@ export default function EventPage() {
       showToast("Could not copy", 'error');
     }
   };
+
+// Add to calendar
+const handleAddToCalendar = () => {
+  hapticFeedback('light');
+  const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : import.meta.env.BASE_URL);
+  const eventUrl = `${baseUrl}/event/${event.id}`;
+  const calendarUrl = buildGoogleCalendarUrl(event, eventUrl);
+  window.open(calendarUrl, '_blank');
+};
 
   // Summarize preferences
   const getPreferencesSummary = () => {
@@ -399,6 +412,11 @@ export default function EventPage() {
                 <button className="btn btn-ghost btn-sm" onClick={shareEvent}>
                   Share
                 </button>
+
+                <button className="btn btn-ghost btn-sm" onClick={handleAddToCalendar}>
+                  📅 Add to Calendar
+                </button>
+
                 {canEdit && (
                   <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
                     Edit
@@ -419,12 +437,14 @@ export default function EventPage() {
               </div>
               <div className="form-group">
                 <label>Course</label>
-                <input
-                  type="text"
-                  className="input"
+                <CourseSearch
                   value={form.courseName}
-                  onChange={(e) => setForm({ ...form, courseName: e.target.value })}
-                  placeholder="Course name"
+                  onChange={(course) => setForm({ 
+                    ...form, 
+                    courseName: course.name,
+                    coursePlaceId: course.placeId || ''
+                  })}
+                  placeholder="Search for a golf course..."
                 />
               </div>
               <div className="form-group">
