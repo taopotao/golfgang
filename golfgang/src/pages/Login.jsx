@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
+<<<<<<< HEAD
 import { auth, db } from "../../firebase";
+=======
+import { auth, db } from "../firebase";
+>>>>>>> 6d9e4c8 (update)
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function Login() {

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, Timestamp, getDocs } from "firebase/firestore";
+<<<<<<< HEAD
 import { db } from "../../firebase";
+=======
+import { db } from "../firebase";
+>>>>>>> 6d9e4c8 (update)
 import { useAuth } from "../providers/AuthProvider";
 import EventCard from "../components/EventCard";
 import { showToast, hapticFeedback } from "../utils/helpers";
