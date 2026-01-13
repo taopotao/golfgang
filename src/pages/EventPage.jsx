@@ -6,8 +6,6 @@ import { useAuth } from "../providers/AuthProvider";
 import GolfConditions from "../components/GolfConditions";
 import CalendarMenu from "../components/CalendarMenu";
 import CourseAutocomplete from "../components/CourseAutocomplete";
-// CSS should be added to index.css, not imported here
-// NOTE: PlacePhoto removed - using gradient fallback instead
 
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
@@ -76,7 +74,8 @@ export default function EventPage() {
     coursePlaceId: "",
     coursePhotoUrl: "",
     courseLat: null,
-    courseLng: null, 
+    courseLng: null,
+    tee: "",
     rsvpDeadline: "",
   });
   const [allUsers, setAllUsers] = useState([]);
@@ -115,8 +114,8 @@ export default function EventPage() {
           courseAddress: data.courseAddress || "",
           coursePlaceId: data.coursePlaceId || "",
           coursePhotoUrl: data.coursePhotoUrl || "",
-          courseLat: data.courseLat || null,      // Add this
-          courseLng: data.courseLng || null,      // Add this
+          courseLat: data.courseLat || null,
+          courseLng: data.courseLng || null,
           tee: data.tee || "",
           rsvpDeadline: data.rsvpDeadline
             ? new Date(data.rsvpDeadline.toDate()).toISOString().slice(0, 16)
@@ -199,8 +198,8 @@ export default function EventPage() {
         courseAddress: form.courseAddress,
         coursePlaceId: form.coursePlaceId,
         coursePhotoUrl: form.coursePhotoUrl,
-        courseLat: form.courseLat || null,  // Add this
-        courseLng: form.courseLng || null,  // Add this
+        courseLat: form.courseLat || null,
+        courseLng: form.courseLng || null,
         tee: form.tee,
         rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline) : null,
       });
@@ -375,7 +374,6 @@ export default function EventPage() {
       <div className="ep-hero">
         {hasCourseInfo ? (
           <div className="ep-hero-image">
-            {/* Gradient background - replace with actual photo component if you have PlacePhoto */}
             <div style={{
               width: '100%',
               height: '100%',
@@ -394,19 +392,16 @@ export default function EventPage() {
           </div>
         )}
         
-        {/* Status badge */}
         <div className="ep-hero-badge">
           <span className={`ep-status-badge ${event.booked ? 'booked' : 'proposed'}`}>
             {event.booked ? '✓ Booked' : 'Proposed'}
           </span>
         </div>
 
-        {/* Title overlay */}
         <div className="ep-hero-content">
           <h1 className="ep-title">{dateStr}</h1>
         </div>
 
-        {/* Quick action buttons - floating */}
         <div className="ep-hero-actions">
           <button className="ep-fab" onClick={shareEvent} title="Share">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -463,7 +458,6 @@ export default function EventPage() {
           </div>
         )}
 
-        {/* Admin quick actions */}
         {(isAdmin || event.createdBy === user?.uid) && !editing && (
           <div className="ep-admin-bar">
             <button className="ep-admin-btn" onClick={() => setEditing(true)}>
@@ -530,8 +524,8 @@ export default function EventPage() {
         </div>
       )}
 
-      {/* WEATHER CONDITIONS - Collapsible */}
-      {hasCourseInfo && date && (
+      {/* WEATHER CONDITIONS - Only show when NOT editing AND has course info */}
+      {!editing && hasCourseInfo && event.courseLat && event.courseLng && date && (
         <div className="ep-card ep-weather-card">
           <button 
             className="ep-collapse-header"
@@ -631,7 +625,6 @@ export default function EventPage() {
         </h3>
         
         <div className="ep-players-grid">
-          {/* Confirmed players */}
           {confirmedIds.map((uid) => {
             const prefs = getResponsePreferences(responses[uid]);
             const isCurrentUser = uid === user?.uid;
@@ -660,7 +653,6 @@ export default function EventPage() {
             );
           })}
           
-          {/* Empty slots */}
           {Array.from({ length: MAX_PLAYERS - confirmedIds.length }).map((_, i) => (
             <div key={`empty-${i}`} className="ep-player ep-player-empty">
               <div className="ep-player-avatar empty">
@@ -671,7 +663,6 @@ export default function EventPage() {
           ))}
         </div>
 
-        {/* Reserve list */}
         {reserveIds.length > 0 && (
           <div className="ep-reserve-section">
             <h4 className="ep-reserve-title">Reserve List</h4>
@@ -693,7 +684,7 @@ export default function EventPage() {
         )}
       </div>
 
-      {/* GROUP PREFERENCES - Collapsible */}
+      {/* GROUP PREFERENCES */}
       {confirmedIds.length > 0 && (
         <div className="ep-card ep-prefs-card">
           <button 
@@ -751,7 +742,7 @@ export default function EventPage() {
         </div>
       )}
 
-      {/* ACTIONS - Destructive at bottom */}
+      {/* ACTIONS */}
       {(myStatus === "available" || isAdmin || event.createdBy === user?.uid) && (
         <div className="ep-card ep-actions-card">
           <h3 className="ep-card-title">Actions</h3>
@@ -805,7 +796,6 @@ export default function EventPage() {
             <h3 className="ep-modal-title">Set Your Preferences</h3>
             
             <div className="ep-modal-content">
-              {/* Time Preference */}
               <div className="ep-pref-group">
                 <label>Preferred Time</label>
                 <div className="ep-toggle-group">
@@ -822,7 +812,6 @@ export default function EventPage() {
                 </div>
               </div>
 
-              {/* Cart Preference */}
               <div className="ep-pref-group">
                 <label>Walk or Cart?</label>
                 <div className="ep-toggle-group">
@@ -839,7 +828,6 @@ export default function EventPage() {
                 </div>
               </div>
 
-              {/* Format Preference */}
               <div className="ep-pref-group">
                 <label>Game Format</label>
                 <div className="ep-toggle-group">

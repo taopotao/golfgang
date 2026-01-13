@@ -1,244 +1,296 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react';
 
-export default function CourseAutocomplete({ value, onSelect }) {
-  const [query, setQuery] = useState(value || '')
-  const [suggestions, setSuggestions] = useState([])
-  const [isOpen, setIsOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const wrapperRef = useRef(null)
-  const debounceRef = useRef(null)
+export default function GolfConditions({ lat, lng, date, coursePlaceId, compact = false }) {
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false)
+    async function fetchWeather() {
+      // Validate inputs
+      if (!lat || !lng || !date) {
+        setLoading(false);
+        setError('Missing location or date information');
+        return;
       }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
-  // Update query when value prop changes
-  useEffect(() => {
-    setQuery(value || '')
-  }, [value])
+      setLoading(true);
+      setError(null);
 
-  // Search for golf courses using Google Places Autocomplete
-  const searchCourses = async (searchQuery) => {
-    if (!searchQuery || searchQuery.length < 3) {
-      setSuggestions([])
-      setIsOpen(false)
-      return
-    }
+      try {
+        // Format date for API (YYYY-MM-DD)
+        const targetDate = new Date(date);
+        const dateStr = targetDate.toISOString().split('T')[0];
 
-    setIsLoading(true)
+        // Open-Meteo API - Free weather API, no key required
+        const url = `https://api.open-meteo.com/v1/forecast?` +
+          `latitude=${lat}&` +
+          `longitude=${lng}&` +
+          `daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode,windspeed_10m_max&` +
+          `timezone=auto&` +
+          `start_date=${dateStr}&` +
+          `end_date=${dateStr}`;
 
-    try {
-      // Check if Google Maps API is loaded
-      if (window.google && window.google.maps && window.google.maps.places) {
-        const service = new window.google.maps.places.AutocompleteService()
+        const response = await fetch(url);
         
-        service.getPlacePredictions(
-          {
-            input: searchQuery,
-            types: ['establishment'],
-            // Bias towards golf-related places
-            componentRestrictions: { country: 'au' }, // Change to your country or remove for global
-          },
-          (predictions, status) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-              // Filter for golf-related places
-              const golfPlaces = predictions.filter(p => 
-                p.description.toLowerCase().includes('golf') ||
-                p.types?.includes('golf_course')
-              )
-              
-              // If no golf-specific results, show all results
-              const results = golfPlaces.length > 0 ? golfPlaces : predictions.slice(0, 5)
-              
-              setSuggestions(results.map(p => ({
-                name: p.structured_formatting?.main_text || p.description,
-                address: p.structured_formatting?.secondary_text || '',
-                placeId: p.place_id,
-                fullDescription: p.description,
-              })))
-              setIsOpen(true)
-            } else {
-              setSuggestions([])
-            }
-            setIsLoading(false)
-          }
-        )
-      } else {
-        // Fallback: Just use the typed value
-        console.warn('Google Maps API not loaded - using manual entry')
-        setSuggestions([])
-        setIsLoading(false)
-      }
-    } catch (err) {
-      console.error('Search error:', err)
-      setSuggestions([])
-      setIsLoading(false)
-    }
-  }
-
-  const handleInputChange = (e) => {
-    const newValue = e.target.value
-    setQuery(newValue)
-
-    // Debounce the search
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-    debounceRef.current = setTimeout(() => {
-      searchCourses(newValue)
-    }, 300)
-  }
-
-  const handleSelect = (suggestion) => {
-    setQuery(suggestion.name)
-    setIsOpen(false)
-    setSuggestions([])
-
-    // Get place details for coordinates
-    if (window.google && window.google.maps && window.google.maps.places && suggestion.placeId) {
-      const service = new window.google.maps.places.PlacesService(
-        document.createElement('div')
-      )
-      
-      service.getDetails(
-        {
-          placeId: suggestion.placeId,
-          fields: ['name', 'formatted_address', 'geometry', 'place_id'],
-        },
-        (place, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
-            onSelect({
-              name: place.name || suggestion.name,
-              address: place.formatted_address || suggestion.address,
-              placeId: place.place_id || suggestion.placeId,
-              lat: place.geometry?.location?.lat(),
-              lng: place.geometry?.location?.lng(),
-            })
-          } else {
-            onSelect({
-              name: suggestion.name,
-              address: suggestion.address,
-              placeId: suggestion.placeId,
-            })
-          }
+        if (!response.ok) {
+          throw new Error('Failed to fetch weather data');
         }
-      )
-    } else {
-      onSelect({
-        name: suggestion.name,
-        address: suggestion.address,
-        placeId: suggestion.placeId,
-      })
+
+        const data = await response.json();
+        
+        if (data.daily) {
+          const weatherCode = data.daily.weathercode?.[0] || 0;
+          const conditions = getWeatherDescription(weatherCode);
+          const tempMax = data.daily.temperature_2m_max?.[0] || 0;
+          const tempMin = data.daily.temperature_2m_min?.[0] || 0;
+          const precipitation = data.daily.precipitation_sum?.[0] || 0;
+          const windSpeed = data.daily.windspeed_10m_max?.[0] || 0;
+          
+          // Calculate playability score (0-10)
+          let score = 10;
+          
+          // Temperature penalties
+          if (tempMax > 35) score -= 2;
+          else if (tempMax > 30) score -= 1;
+          if (tempMax < 5) score -= 2;
+          else if (tempMax < 10) score -= 1;
+          
+          // Precipitation penalties
+          if (precipitation > 10) score -= 3;
+          else if (precipitation > 5) score -= 2;
+          else if (precipitation > 1) score -= 1;
+          
+          // Wind penalties
+          if (windSpeed > 40) score -= 2;
+          else if (windSpeed > 25) score -= 1;
+          
+          score = Math.max(0, Math.min(10, score));
+
+          setWeather({
+            temperature: Math.round((tempMax + tempMin) / 2),
+            tempMax: Math.round(tempMax),
+            tempMin: Math.round(tempMin),
+            conditions,
+            precipitation,
+            windSpeed: Math.round(windSpeed),
+            playabilityScore: score,
+            weatherCode,
+          });
+        } else {
+          throw new Error('Invalid weather data received');
+        }
+      } catch (err) {
+        console.error('Error fetching weather:', err);
+        setError('Unable to load weather data');
+      } finally {
+        setLoading(false);
+      }
     }
+
+    fetchWeather();
+  }, [lat, lng, date]);
+
+  // Convert weather code to description
+  function getWeatherDescription(code) {
+    if (code === 0) return 'Clear';
+    if (code <= 3) return 'Partly Cloudy';
+    if (code <= 48) return 'Foggy';
+    if (code <= 67) return 'Rainy';
+    if (code <= 77) return 'Snow';
+    if (code <= 82) return 'Rain Showers';
+    if (code <= 86) return 'Snow Showers';
+    if (code <= 99) return 'Thunderstorm';
+    return 'Unknown';
   }
 
-  const handleManualEntry = () => {
-    // Allow manual entry without selecting from dropdown
-    onSelect({
-      name: query,
-      address: '',
-      placeId: '',
-    })
-    setIsOpen(false)
+  // Get weather emoji
+  function getWeatherEmoji(code) {
+    if (code === 0) return '☀️';
+    if (code <= 3) return '⛅';
+    if (code <= 48) return '🌫️';
+    if (code <= 67) return '🌧️';
+    if (code <= 77) return '🌨️';
+    if (code <= 82) return '🌦️';
+    if (code <= 86) return '🌨️';
+    if (code <= 99) return '⛈️';
+    return '🌤️';
   }
 
+  // Get playability color
+  function getPlayabilityColor(score) {
+    if (score >= 8) return '#10b981'; // green
+    if (score >= 6) return '#f59e0b'; // orange
+    return '#ef4444'; // red
+  }
+
+  // Get playability label
+  function getPlayabilityLabel(score) {
+    if (score >= 8) return 'Excellent';
+    if (score >= 6) return 'Good';
+    if (score >= 4) return 'Fair';
+    return 'Poor';
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+        <div className="spinner"></div>
+        <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+          Loading weather...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--color-text-secondary)' }}>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!weather) {
+    return null;
+  }
+
+  // Compact view for collapsed state
+  if (compact) {
+    return (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 'var(--space-3)',
+        padding: 'var(--space-3)',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-2xl)' }}>
+            {getWeatherEmoji(weather.weatherCode)}
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+            {weather.conditions}
+          </div>
+        </div>
+        
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>
+            {weather.temperature}°C
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+            Temperature
+          </div>
+        </div>
+        
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--text-xl)', 
+            fontWeight: 600,
+            color: getPlayabilityColor(weather.playabilityScore)
+          }}>
+            {weather.playabilityScore}/10
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+            {getPlayabilityLabel(weather.playabilityScore)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full expanded view
   return (
-    <div ref={wrapperRef} style={{ position: 'relative' }}>
-      <input
-        type="text"
-        className="input"
-        value={query}
-        onChange={handleInputChange}
-        onBlur={() => {
-          // Delay to allow click on suggestion
-          setTimeout(() => {
-            if (query && !isOpen) {
-              handleManualEntry()
-            }
-          }, 200)
-        }}
-        placeholder="Search for a golf course..."
-      />
-      
-      {isLoading && (
-        <div style={{ 
-          position: 'absolute', 
-          right: 12, 
-          top: '50%', 
-          transform: 'translateY(-50%)',
-        }}>
-          <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }}></div>
-        </div>
-      )}
-      
-      {isOpen && suggestions.length > 0 && (
-        <ul style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          marginTop: 4,
-          padding: 0,
-          listStyle: 'none',
-          zIndex: 100,
-          maxHeight: 250,
-          overflowY: 'auto',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        }}>
-          {suggestions.map((suggestion, index) => (
-            <li
-              key={suggestion.placeId || index}
-              onClick={() => handleSelect(suggestion)}
-              style={{
-                padding: '12px 14px',
-                cursor: 'pointer',
-                borderBottom: index < suggestions.length - 1 ? '1px solid var(--color-border-light)' : 'none',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              <div style={{ fontWeight: 500, fontSize: 14 }}>
-                ⛳ {suggestion.name}
-              </div>
-              {suggestion.address && (
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                  {suggestion.address}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      
-      {isOpen && suggestions.length === 0 && query.length >= 3 && !isLoading && (
+    <div style={{ padding: 'var(--space-4)' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 'var(--space-4)',
+        marginBottom: 'var(--space-4)',
+      }}>
         <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
+          textAlign: 'center',
+          padding: 'var(--space-4)',
+          background: 'var(--color-bg)',
           borderRadius: 'var(--radius-md)',
-          marginTop: 4,
-          padding: '12px 14px',
-          zIndex: 100,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          fontSize: 14,
-          color: 'var(--color-text-secondary)',
         }}>
-          No results found. Press Enter to use "{query}"
+          <div style={{ fontSize: '48px', marginBottom: 'var(--space-2)' }}>
+            {getWeatherEmoji(weather.weatherCode)}
+          </div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>
+            {weather.conditions}
+          </div>
         </div>
-      )}
+
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--space-4)',
+          background: 'var(--color-bg)',
+          borderRadius: 'var(--radius-md)',
+        }}>
+          <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700 }}>
+            {weather.temperature}°C
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+            {weather.tempMin}° - {weather.tempMax}°
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 'var(--space-3)',
+      }}>
+        <div style={{
+          padding: 'var(--space-3)',
+          background: 'var(--color-bg)',
+          borderRadius: 'var(--radius-md)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+            Wind
+          </div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginTop: 'var(--space-1)' }}>
+            {weather.windSpeed} km/h
+          </div>
+        </div>
+
+        <div style={{
+          padding: 'var(--space-3)',
+          background: 'var(--color-bg)',
+          borderRadius: 'var(--radius-md)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+            Rain
+          </div>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginTop: 'var(--space-1)' }}>
+            {weather.precipitation} mm
+          </div>
+        </div>
+
+        <div style={{
+          padding: 'var(--space-3)',
+          background: 'var(--color-bg)',
+          borderRadius: 'var(--radius-md)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+            Playability
+          </div>
+          <div style={{ 
+            fontSize: 'var(--text-lg)', 
+            fontWeight: 700, 
+            marginTop: 'var(--space-1)',
+            color: getPlayabilityColor(weather.playabilityScore)
+          }}>
+            {weather.playabilityScore}/10
+          </div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+            {getPlayabilityLabel(weather.playabilityScore)}
+          </div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
