@@ -1,42 +1,78 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { collection, onSnapshot, addDoc, Timestamp, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../providers/AuthProvider";
+import { Link } from "react-router-dom";
 import EventCard from "../components/EventCard";
-import { 
-  showToast, 
-  hapticFeedback,
-  buildGoogleCalendarUrl
-} from "../utils/helpers";
+import CalendarStrip from "../components/CalendarStrip";
+import { showToast, hapticFeedback, triggerConfetti } from "../utils/helpers";
+
+// Helper to get status from response
+const getResponseStatus = (response) => {
+  if (!response) return null;
+  if (typeof response === "string") return response;
+  return response.status;
+};
+
+// Get relative time string
+const getRelativeTime = (date) => {
+  const now = new Date();
+  const eventDate = new Date(date);
+  const diffTime = eventDate - now;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return "Past";
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays < 7) return `In ${diffDays} days`;
+  if (diffDays < 14) return "Next week";
+  return `In ${Math.ceil(diffDays / 7)} weeks`;
+};
+
+// Group events by timeframe
+const groupEventsByTimeframe = (events) => {
+  const now = new Date();
+  const thisWeekEnd = new Date(now);
+  thisWeekEnd.setDate(now.getDate() + (7 - now.getDay()));
+  
+  const nextWeekEnd = new Date(thisWeekEnd);
+  nextWeekEnd.setDate(thisWeekEnd.getDate() + 7);
+
+  const groups = {
+    thisWeek: [],
+    nextWeek: [],
+    later: [],
+  };
+
+  events.forEach((event) => {
+    const eventDate = event.date?.toDate ? event.date.toDate() : new Date(event.date);
+    if (eventDate <= thisWeekEnd) {
+      groups.thisWeek.push(event);
+    } else if (eventDate <= nextWeekEnd) {
+      groups.nextWeek.push(event);
+    } else {
+      groups.later.push(event);
+    }
+  });
+
+  return groups;
+};
 
 export default function Home() {
   const { user, profile } = useAuth();
-  
-    const getEventCalendarUrl = (event) => {
-    const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : import.meta.env.BASE_URL);
-    const eventUrl = `${baseUrl}/event/${event.id}`;
-    return buildGoogleCalendarUrl(event, eventUrl);
-  };
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
-  
-  // Form state with preferences
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [weatherCache, setWeatherCache] = useState({});
+
   const [form, setForm] = useState({
     date: "",
-    tee: "",
+    tee: "08:00",
     courseName: "",
     notes: "",
-  });
-
-  // Proposer preferences
-  const [preferences, setPreferences] = useState({
-    timePreference: "",
-    cartPreference: "",
-    formatPreference: "",
-    coursePreference: "",
   });
 
   // Load events
@@ -58,6 +94,101 @@ export default function Home() {
     loadUsers();
   }, []);
 
+  // Fetch weather for event dates
+  useEffect(() => {
+    const fetchWeather = async () => {
+      const upcomingDates = events
+        .filter((e) => {
+          const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+          return d >= new Date();
+        })
+        .map((e) => {
+          const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+          return d.toISOString().split("T")[0];
+        })
+        .filter((date, index, self) => self.indexOf(date) === index)
+        .slice(0, 7); // Only fetch for next 7 unique dates
+
+      for (const dateStr of upcomingDates) {
+        if (weatherCache[dateStr]) continue;
+        
+        try {
+          // Using Open-Meteo API (free, no key required)
+          const [year, month, day] = dateStr.split("-");
+          const response = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=-33.87&longitude=151.21&daily=temperature_2m_max,precipitation_probability_max,weathercode&timezone=Australia/Sydney&start_date=${dateStr}&end_date=${dateStr}`
+          );
+          const data = await response.json();
+          
+          if (data.daily) {
+            setWeatherCache((prev) => ({
+              ...prev,
+              [dateStr]: {
+                temp: Math.round(data.daily.temperature_2m_max[0]),
+                rain: data.daily.precipitation_probability_max[0],
+                code: data.daily.weathercode[0],
+              },
+            }));
+          }
+        } catch (err) {
+          console.warn("Weather fetch failed:", err);
+        }
+      }
+    };
+
+    if (events.length > 0) {
+      fetchWeather();
+    }
+  }, [events]);
+
+  // Get weather icon from code
+  const getWeatherIcon = (code) => {
+    if (code === 0) return "☀️";
+    if (code <= 3) return "⛅";
+    if (code <= 48) return "☁️";
+    if (code <= 67) return "🌧️";
+    if (code <= 77) return "🌨️";
+    if (code <= 82) return "🌧️";
+    if (code >= 95) return "⛈️";
+    return "🌤️";
+  };
+
+  // Filter and sort events
+  const now = new Date();
+  const upcomingEvents = events
+    .filter((e) => {
+      const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+      return d >= new Date(now.setHours(0, 0, 0, 0));
+    })
+    .sort((a, b) => {
+      const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+      const db = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+      return da - db;
+    });
+
+  // Filter by selected date if any
+  const filteredEvents = selectedDate
+    ? upcomingEvents.filter((e) => {
+        const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+        return d.toDateString() === selectedDate.toDateString();
+      })
+    : upcomingEvents;
+
+  const groupedEvents = groupEventsByTimeframe(filteredEvents);
+
+  // Get user's first name
+  const firstName = profile?.username?.split(" ")[0] || 
+                    profile?.email?.split("@")[0] || 
+                    "Golfer";
+
+  // Get greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
   // Format date as title
   const formatDateAsTitle = (dateString) => {
     if (!dateString) return "";
@@ -76,7 +207,6 @@ export default function Home() {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!form.date) {
       showToast("Please select a date", "error");
       return;
@@ -87,7 +217,7 @@ export default function Home() {
 
     try {
       const [year, month, day] = form.date.split("-").map(Number);
-      const eventDate = new Date(year, month - 1, day);
+      const eventDate = new Date(year, month - 1, day, 12, 0, 0);
 
       await addDoc(collection(db, "events"), {
         title: formatDateAsTitle(form.date),
@@ -95,250 +225,158 @@ export default function Home() {
         tee: form.tee || null,
         courseName: form.courseName || null,
         notes: form.notes || null,
-        proposedBy: user.uid,
-        proposedByName: profile?.username || user.email?.split("@")[0],
         booked: false,
+        createdBy: user.uid,
         createdAt: Timestamp.now(),
         responses: {
-          [user.uid]: {
-            status: "available",
-            preferences: {
-              timePreference: preferences.timePreference || null,
-              cartPreference: preferences.cartPreference || null,
-              formatPreference: preferences.formatPreference || null,
-              coursePreference: preferences.coursePreference || null,
-            },
-            updatedAt: new Date().toISOString(),
-          },
+          [user.uid]: { status: "available", respondedAt: Timestamp.now() },
         },
       });
 
       showToast("Round proposed! ⛳", "success");
-      setForm({ date: "", tee: "", courseName: "", notes: "" });
-      setPreferences({ timePreference: "", cartPreference: "", formatPreference: "", coursePreference: "" });
+      setForm({ date: "", tee: "08:00", courseName: "", notes: "" });
       setShowForm(false);
-    } catch (err) {
-      console.error("Error creating event:", err);
+    } catch (error) {
+      console.error("Error creating event:", error);
       showToast("Failed to create event", "error");
-    } finally {
-      setCreating(false);
     }
+    setCreating(false);
   };
 
-  // Filter and sort events
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  
-  const upcomingEvents = events
-    .filter((ev) => {
-      const evDate = ev.date?.toDate?.();
-      return evDate && evDate >= now;
-    })
-    .sort((a, b) => a.date.toMillis() - b.date.toMillis());
-
-  const pastEvents = events
-    .filter((ev) => {
-      const evDate = ev.date?.toDate?.();
-      return evDate && evDate < now;
-    })
-    .sort((a, b) => b.date.toMillis() - a.date.toMillis())
-    .slice(0, 5);
-
-  // Get min date (tomorrow)
-  const getMinDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  };
+  // Count events needing response
+  const needsResponseCount = upcomingEvents.filter((e) => {
+    if (!user) return false;
+    const response = e.responses?.[user.uid];
+    return !response;
+  }).length;
 
   if (loading) {
     return (
       <div className="page">
         <div className="page-content">
-          <div className="skeleton" style={{ height: 60, marginBottom: 16 }}></div>
-          <div className="skeleton" style={{ height: 100, marginBottom: 12 }}></div>
-          <div className="skeleton" style={{ height: 100, marginBottom: 12 }}></div>
-          <div className="skeleton" style={{ height: 100 }}></div>
+          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+            <div className="spinner"></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="page">
+    <div className="page home-page">
       <div className="page-content">
-        {/* Header */}
-        <div className="page-header">
-          <h1 className="page-title">Upcoming Rounds</h1>
-          <button 
-            className="btn btn-primary"
+        {/* Greeting Header */}
+        <div className="home-header">
+          <div className="home-greeting">
+            <h1 className="greeting-text">
+              {getGreeting()}, {firstName}! 👋
+            </h1>
+            <p className="greeting-subtitle">
+              {upcomingEvents.length === 0
+                ? "No upcoming rounds scheduled"
+                : upcomingEvents.length === 1
+                ? "1 upcoming round"
+                : `${upcomingEvents.length} upcoming rounds`}
+              {needsResponseCount > 0 && (
+                <span className="needs-response-badge">
+                  {needsResponseCount} awaiting RSVP
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            className="btn btn-primary propose-btn"
             onClick={() => setShowForm(!showForm)}
           >
             {showForm ? "Cancel" : "+ Propose"}
           </button>
         </div>
 
+        {/* Calendar Strip */}
+        <CalendarStrip
+          events={events}
+          selectedDate={selectedDate}
+          onDateSelect={(date) => {
+            if (selectedDate && date.toDateString() === selectedDate.toDateString()) {
+              setSelectedDate(null); // Deselect
+            } else {
+              setSelectedDate(date);
+            }
+            hapticFeedback("light");
+          }}
+        />
+
+        {/* Selected date indicator */}
+        {selectedDate && (
+          <div className="selected-date-bar">
+            <span>
+              Showing events for{" "}
+              <strong>
+                {selectedDate.toLocaleDateString("en-AU", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </strong>
+            </span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setSelectedDate(null)}
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
+
         {/* Propose Form */}
         {showForm && (
-          <div className="card" style={{ marginBottom: 24 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Propose a Round</h3>
+          <div className="card propose-card">
+            <h3 className="card-title">Propose a Round</h3>
             <form onSubmit={handleSubmit}>
-              {/* Date */}
-              <div className="form-group">
-                <label htmlFor="date">Date *</label>
-                <input
-                  id="date"
-                  type="date"
-                  className="input"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  min={getMinDate()}
-                  required
-                />
-              </div>
-
-              {/* Tee Time (optional - can be decided later) */}
-              <div className="form-group">
-                <label htmlFor="tee">Tee Time (if known)</label>
-                <input
-                  id="tee"
-                  type="time"
-                  className="input"
-                  value={form.tee}
-                  onChange={(e) => setForm({ ...form, tee: e.target.value })}
-                />
-              </div>
-              
-              {/* Course (optional) */}
-              <div className="form-group">
-                <label htmlFor="course">Course (if known)</label>
-                <input
-                  id="course"
-                  type="text"
-                  className="input"
-                  value={form.courseName}
-                  onChange={(e) => setForm({ ...form, courseName: e.target.value })}
-                  placeholder="e.g., Royal Melbourne"
-                />
-              </div>
-
-              {/* Preferences Section */}
-              <div className="preferences-section">
-                <h4 className="preferences-title">Your Preferences</h4>
-                
-                {/* Time Preference */}
+              <div className="form-row">
                 <div className="form-group">
-                  <label>Time Preference</label>
-                  <div className="toggle-group">
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.timePreference === 'AM' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, timePreference: preferences.timePreference === 'AM' ? '' : 'AM' })}
-                    >
-                      ☀️ AM
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.timePreference === 'PM' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, timePreference: preferences.timePreference === 'PM' ? '' : 'PM' })}
-                    >
-                      🌅 PM
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.timePreference === 'Any' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, timePreference: preferences.timePreference === 'Any' ? '' : 'Any' })}
-                    >
-                      🤷 Any
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cart Preference */}
-                <div className="form-group">
-                  <label>Walk or Cart?</label>
-                  <div className="toggle-group">
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.cartPreference === 'Walk' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, cartPreference: preferences.cartPreference === 'Walk' ? '' : 'Walk' })}
-                    >
-                      🚶 Walk
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.cartPreference === 'Cart' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, cartPreference: preferences.cartPreference === 'Cart' ? '' : 'Cart' })}
-                    >
-                      🛒 Cart
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.cartPreference === 'Any' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, cartPreference: preferences.cartPreference === 'Any' ? '' : 'Any' })}
-                    >
-                      🤷 Any
-                    </button>
-                  </div>
-                </div>
-
-                {/* Format Preference */}
-                <div className="form-group">
-                  <label>Game Format</label>
-                  <div className="toggle-group">
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.formatPreference === 'Stroke' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, formatPreference: preferences.formatPreference === 'Stroke' ? '' : 'Stroke' })}
-                    >
-                      🎯 Stroke
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.formatPreference === 'Scramble' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, formatPreference: preferences.formatPreference === 'Scramble' ? '' : 'Scramble' })}
-                    >
-                      🤝 Scramble
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-btn ${preferences.formatPreference === 'Any' ? 'active' : ''}`}
-                      onClick={() => setPreferences({ ...preferences, formatPreference: preferences.formatPreference === 'Any' ? '' : 'Any' })}
-                    >
-                      🤷 Any
-                    </button>
-                  </div>
-                </div>
-
-                {/* Course Preference (free text) */}
-                <div className="form-group">
-                  <label htmlFor="coursePreference">Course Preference</label>
+                  <label>Date *</label>
                   <input
-                    id="coursePreference"
-                    type="text"
+                    type="date"
                     className="input"
-                    value={preferences.coursePreference}
-                    onChange={(e) => setPreferences({ ...preferences, coursePreference: e.target.value })}
-                    placeholder="e.g., Somewhere close to CBD"
+                    value={form.date}
+                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    min={new Date().toISOString().split("T")[0]}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Tee Time</label>
+                  <input
+                    type="time"
+                    className="input"
+                    value={form.tee}
+                    onChange={(e) => setForm({ ...form, tee: e.target.value })}
                   />
                 </div>
               </div>
-              
-              {/* Notes */}
               <div className="form-group">
-                <label htmlFor="notes">Notes (optional)</label>
-                <textarea
-                  id="notes"
+                <label>Course (optional)</label>
+                <input
+                  type="text"
                   className="input"
-                  rows={2}
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Any additional details..."
+                  placeholder="e.g. Royal Sydney Golf Club"
+                  value={form.courseName}
+                  onChange={(e) => setForm({ ...form, courseName: e.target.value })}
                 />
               </div>
-              
-              <button 
-                type="submit" 
+              <div className="form-group">
+                <label>Notes (optional)</label>
+                <textarea
+                  className="input"
+                  placeholder="Any details about the round..."
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              <button
+                type="submit"
                 className="btn btn-primary btn-full"
                 disabled={creating}
               >
@@ -348,32 +386,158 @@ export default function Home() {
           </div>
         )}
 
-        {/* Upcoming Events */}
-        {upcomingEvents.length === 0 ? (
-          <div className="card empty-state">
-            <div className="empty-state-icon">🏌️</div>
-            <div className="empty-state-title">No upcoming rounds</div>
-            <p>Be the first to propose a round!</p>
-          </div>
-        ) : (
-          <div className="event-list">
-            {upcomingEvents.map((ev) => (
-              <EventCard key={ev.id} event={ev} users={users} />
-            ))}
+        {/* Quick Action - No events this weekend */}
+        {upcomingEvents.filter((e) => {
+          const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+          const daysUntil = Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+          return daysUntil <= 3;
+        }).length === 0 && !showForm && (
+          <div className="quick-action-card">
+            <div className="quick-action-icon">🏌️</div>
+            <div className="quick-action-text">
+              <strong>Nothing coming up soon!</strong>
+              <span>How about a round this weekend?</span>
+            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowForm(true)}
+            >
+              Propose
+            </button>
           </div>
         )}
 
-        {/* Past Events */}
-        {pastEvents.length > 0 && (
+        {/* Events List */}
+        {filteredEvents.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">⛳</div>
+            <div className="empty-state-title">
+              {selectedDate ? "No rounds on this day" : "No upcoming rounds"}
+            </div>
+            <p>
+              {selectedDate
+                ? "Try selecting a different date or clear the filter"
+                : "Be the first to propose a round!"}
+            </p>
+            {!showForm && !selectedDate && (
+              <button
+                className="btn btn-primary"
+                style={{ marginTop: 16 }}
+                onClick={() => setShowForm(true)}
+              >
+                + Propose a Round
+              </button>
+            )}
+          </div>
+        ) : (
           <>
-            <div className="section-divider">
-              <span>Past Rounds</span>
-            </div>
-            <div className="event-list event-list-past">
-              {pastEvents.map((ev) => (
-                <EventCard key={ev.id} event={ev} users={users} />
-              ))}
-            </div>
+            {/* This Week */}
+            {groupedEvents.thisWeek.length > 0 && !selectedDate && (
+              <div className="event-section">
+                <div className="section-header">
+                  <span className="section-title">This Week</span>
+                  <span className="section-count">{groupedEvents.thisWeek.length}</span>
+                </div>
+                <div className="event-list">
+                  {groupedEvents.thisWeek.map((ev) => (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      users={users}
+                      weather={weatherCache[
+                        (ev.date?.toDate ? ev.date.toDate() : new Date(ev.date))
+                          .toISOString()
+                          .split("T")[0]
+                      ]}
+                      getWeatherIcon={getWeatherIcon}
+                      relativeTime={getRelativeTime(
+                        ev.date?.toDate ? ev.date.toDate() : new Date(ev.date)
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Next Week */}
+            {groupedEvents.nextWeek.length > 0 && !selectedDate && (
+              <div className="event-section">
+                <div className="section-header">
+                  <span className="section-title">Next Week</span>
+                  <span className="section-count">{groupedEvents.nextWeek.length}</span>
+                </div>
+                <div className="event-list">
+                  {groupedEvents.nextWeek.map((ev) => (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      users={users}
+                      weather={weatherCache[
+                        (ev.date?.toDate ? ev.date.toDate() : new Date(ev.date))
+                          .toISOString()
+                          .split("T")[0]
+                      ]}
+                      getWeatherIcon={getWeatherIcon}
+                      relativeTime={getRelativeTime(
+                        ev.date?.toDate ? ev.date.toDate() : new Date(ev.date)
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Later */}
+            {groupedEvents.later.length > 0 && !selectedDate && (
+              <div className="event-section">
+                <div className="section-header">
+                  <span className="section-title">Later</span>
+                  <span className="section-count">{groupedEvents.later.length}</span>
+                </div>
+                <div className="event-list">
+                  {groupedEvents.later.map((ev) => (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      users={users}
+                      weather={weatherCache[
+                        (ev.date?.toDate ? ev.date.toDate() : new Date(ev.date))
+                          .toISOString()
+                          .split("T")[0]
+                      ]}
+                      getWeatherIcon={getWeatherIcon}
+                      relativeTime={getRelativeTime(
+                        ev.date?.toDate ? ev.date.toDate() : new Date(ev.date)
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Selected date events */}
+            {selectedDate && (
+              <div className="event-section">
+                <div className="event-list">
+                  {filteredEvents.map((ev) => (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      users={users}
+                      weather={weatherCache[
+                        (ev.date?.toDate ? ev.date.toDate() : new Date(ev.date))
+                          .toISOString()
+                          .split("T")[0]
+                      ]}
+                      getWeatherIcon={getWeatherIcon}
+                      relativeTime={getRelativeTime(
+                        ev.date?.toDate ? ev.date.toDate() : new Date(ev.date)
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

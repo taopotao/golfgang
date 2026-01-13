@@ -1,341 +1,287 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { doc, onSnapshot, updateDoc, deleteDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../providers/AuthProvider";
-import '../components/RsvpStyles.css';
-import GolfConditions from '../components/GolfConditions';
-import { 
-  showToast, 
-  hapticFeedback, 
-  triggerConfetti,
-  formatEventDate,
-  getInitials,
-  getAvatarStyle,
-  buildGoogleCalendarUrl 
-} from "../utils/helpers";
-import CourseSearch from '../components/CourseSearch';
+import GolfConditions from "../components/GolfConditions";
+import CalendarMenu from "../components/CalendarMenu";
+import CourseAutocomplete from "../components/CourseAutocomplete";
+// CSS should be added to index.css, not imported here
+// NOTE: PlacePhoto removed - using gradient fallback instead
 
-const MAX_PLAYERS = 4;
+// Build Google Calendar URL
+function buildGoogleCalendarUrl(event, eventUrl) {
+  const date = event.date?.toDate ? event.date.toDate() : new Date();
+  const teeTime = event.tee || "";
+  const courseName = event.courseName || "";
+  const notes = event.notes || "";
 
-// Helper to get status from response
-const getResponseStatus = (response) => {
-  if (!response) return null;
-  if (typeof response === 'string') return response;
-  return response.status;
-};
+  let startDateTime = new Date(date);
+  if (teeTime) {
+    const [h, m] = teeTime.split(":").map((x) => parseInt(x, 10));
+    if (!Number.isNaN(h)) startDateTime.setHours(h);
+    if (!Number.isNaN(m)) startDateTime.setMinutes(m);
+  }
 
-// Helper to get preferences from response
-const getResponsePreferences = (response) => {
-  if (!response) return null;
-  if (typeof response === 'string') return null;
-  return response.preferences || null;
-};
+  const endDateTime = new Date(startDateTime.getTime() + 4.5 * 60 * 60 * 1000);
+
+  const formatDate = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `⛳ ${teeTime || "Golf"} - ${courseName || "Golf Round"}`,
+    dates: `${formatDate(startDateTime)}/${formatDate(endDateTime)}`,
+    details: notes ? `${notes}\n\nEvent: ${eventUrl}` : `Event: ${eventUrl}`,
+    location: courseName,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// Build Google Maps URL
+function buildGoogleMapsUrl(placeId, courseName) {
+  if (placeId) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(courseName || "Golf Course")}&query_place_id=${placeId}`;
+  }
+  if (courseName) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(courseName)}`;
+  }
+  return null;
+}
 
 export default function EventPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
-  
-  const [event, setEvent] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showRsvpForm, setShowRsvpForm] = useState(false);
-  
-  // Edit form state
-  const [form, setForm] = useState({
-    tee: "",
-    courseName: "",
-    coursePlaceId: "",
-    notes: "",
-  });
 
-  // RSVP preferences state
-  const [rsvpPreferences, setRsvpPreferences] = useState({
+  const [event, setEvent] = useState(null);
+  const [responses, setResponses] = useState({});
+  const [myStatus, setMyStatus] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
+  const [savingResponse, setSavingResponse] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [showRSVPModal, setShowRSVPModal] = useState(false);
+  const [weatherExpanded, setWeatherExpanded] = useState(false);
+  const [prefsExpanded, setPrefsExpanded] = useState(false);
+  const [preferences, setPreferences] = useState({
     timePreference: "",
     cartPreference: "",
     formatPreference: "",
-    coursePreference: "",
+    courseNotes: "",
   });
+  const [form, setForm] = useState({
+    title: "",
+    notes: "",
+    courseName: "",
+    courseAddress: "",
+    coursePlaceId: "",
+    coursePhotoUrl: "",
+    courseLat: null,
+    courseLng: null, 
+    rsvpDeadline: "",
+  });
+  const [allUsers, setAllUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Load event
+  const MAX_PLAYERS = 4;
+
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "events", id), (snap) => {
-      if (snap.exists()) {
-        setEvent({ id: snap.id, ...snap.data() });
-        setForm({
-          tee: snap.data().tee || "",
-          courseName: snap.data().courseName || "",
-          coursePlaceId: snap.data().coursePlaceId || "",
-          notes: snap.data().notes || "",
-        });
-      } else {
-        setEvent(null);
-      }
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [id]);
-
-  // Load user's existing preferences when event loads
-  useEffect(() => {
-    if (event && user) {
-      const myResponse = event.responses?.[user.uid];
-      const myPrefs = getResponsePreferences(myResponse);
-      if (myPrefs) {
-        setRsvpPreferences({
-          timePreference: myPrefs.timePreference || "",
-          cartPreference: myPrefs.cartPreference || "",
-          formatPreference: myPrefs.formatPreference || "",
-          coursePreference: myPrefs.coursePreference || "",
-        });
-      }
-    }
-  }, [event, user]);
-
-  // Load users
-  useEffect(() => {
-    async function loadUsers() {
-      const snap = await getDocs(collection(db, "users"));
-      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }
-    loadUsers();
-  }, []);
-
-  // Get username from user ID
-  const getUserName = (uid) => {
-    const u = users.find(u => u.id === uid);
-    return u?.username || u?.email?.split('@')[0] || 'Unknown';
-  };
-
-  // Get responses
-  const responses = event?.responses || {};
-  const myStatus = user ? getResponseStatus(responses[user.uid]) : null;
-  const myPreferences = user ? getResponsePreferences(responses[user.uid]) : null;
-  
-  // Separate confirmed and unavailable
-  const confirmedIds = Object.entries(responses)
-    .filter(([_, r]) => getResponseStatus(r) === 'available')
-    .map(([uid]) => uid);
-  
-  const unavailableIds = Object.entries(responses)
-    .filter(([_, r]) => getResponseStatus(r) === 'unavailable')
-    .map(([uid]) => uid);
-
-  // Check if user is the proposer
-  const isProposer = user?.uid === event?.proposedBy;
-  const canEdit = isAdmin || isProposer;
-
-  // RSVP handler with preferences
-  const handleRSVP = async (status) => {
-    if (!event || !user) return;
-    hapticFeedback('medium');
-
-    try {
-      const ref = doc(db, "events", event.id);
-      const newResponses = { ...responses };
-      
-      if (status === null) {
-        delete newResponses[user.uid];
-      } else {
-        newResponses[user.uid] = {
-          status,
-          preferences: status === 'available' ? {
-            timePreference: rsvpPreferences.timePreference || null,
-            cartPreference: rsvpPreferences.cartPreference || null,
-            formatPreference: rsvpPreferences.formatPreference || null,
-            coursePreference: rsvpPreferences.coursePreference || null,
-          } : null,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      
-      await updateDoc(ref, { responses: newResponses });
-      
-      if (status === 'available') {
-        showToast("You're in! ⛳", 'success');
-        setShowRsvpForm(false);
-      } else if (status === 'unavailable') {
-        showToast("Response saved", 'default');
-        setShowRsvpForm(false);
-      }
-    } catch (err) {
-      console.error("Error updating RSVP:", err);
-      showToast("Failed to save response", 'error');
-    }
-  };
-
-  // Remove player (admin only)
-  const removePlayer = async (uid) => {
-    if (!event || !uid) return;
-    hapticFeedback('medium');
-    
-    try {
-      const ref = doc(db, "events", event.id);
-      const newResponses = { ...responses };
-      delete newResponses[uid];
-      await updateDoc(ref, { responses: newResponses });
-      showToast("Player removed", 'default');
-    } catch (err) {
-      console.error("Error removing player:", err);
-      showToast("Failed to remove player", 'error');
-    }
-  };
-
-  // Mark as booked
-  const markBooked = async () => {
-    if (!event) return;
-    hapticFeedback('success');
-    
-    try {
-      const ref = doc(db, "events", event.id);
-      await updateDoc(ref, { booked: true, bookedAt: new Date().toISOString() });
-      triggerConfetti();
-      showToast("Round confirmed! ⛳🎉", 'success');
-    } catch (err) {
-      console.error("Error booking:", err);
-      showToast("Failed to book", 'error');
-    }
-  };
-
-  // Unmark booked
-  const unmarkBooked = async () => {
-    if (!event) return;
-    hapticFeedback('medium');
-    
-    try {
-      const ref = doc(db, "events", event.id);
-      await updateDoc(ref, { booked: false, bookedAt: null });
-      showToast("Booking removed", 'default');
-    } catch (err) {
-      console.error("Error:", err);
-      showToast("Failed to update", 'error');
-    }
-  };
-
-  // Save edits
-      const saveEdits = async () => {
-      if (!event) return;
-      setSaving(true);
-      
+    async function loadEvent() {
       try {
-        const ref = doc(db, "events", event.id);
-        await updateDoc(ref, {
-          tee: form.tee || null,
-          courseName: form.courseName || null,
-          coursePlaceId: form.coursePlaceId || null,  // ✨ ADD THIS
-          notes: form.notes || null,
+        const ref = doc(db, "events", id);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          navigate("/");
+          return;
+        }
+        const data = snap.data();
+        setEvent({ id: snap.id, ...data });
+
+        const r = data.responses || {};
+        setResponses(r);
+
+        if (user) {
+          const userResponse = r[user.uid];
+          setMyStatus(userResponse ? (typeof userResponse === 'string' ? userResponse : userResponse.status) : null);
+          if (userResponse && typeof userResponse === 'object' && userResponse.preferences) {
+            setPreferences(userResponse.preferences);
+          }
+        }
+
+        setForm({
+          title: data.title || "",
+          notes: data.notes || "",
+          courseName: data.courseName || "",
+          courseAddress: data.courseAddress || "",
+          coursePlaceId: data.coursePlaceId || "",
+          coursePhotoUrl: data.coursePhotoUrl || "",
+          courseLat: data.courseLat || null,      // Add this
+          courseLng: data.courseLng || null,      // Add this
+          tee: data.tee || "",
+          rsvpDeadline: data.rsvpDeadline
+            ? new Date(data.rsvpDeadline.toDate()).toISOString().slice(0, 16)
+            : "",
         });
-        setEditing(false);
-        showToast("Changes saved", 'success');
       } catch (err) {
-        console.error("Error saving:", err);
-        showToast("Failed to save", 'error');
-      } finally {
-        setSaving(false);
+        console.error("Error loading event:", err);
       }
-    };
+      setLoadingEvent(false);
+    }
+
+    async function loadUsers() {
+      try {
+        const snap = await getDocs(collection(db, "users"));
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAllUsers(list);
+      } catch (err) {
+        console.error("Error loading users:", err);
+      }
+      setLoadingUsers(false);
+    }
+
+    loadEvent();
+    loadUsers();
+  }, [id, navigate, user]);
+
+  // Show toast notification
+  function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast-notification show toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
+  // Update RSVP response
+  async function updateResponse(status, prefs = null) {
+    setSavingResponse(true);
+    try {
+      const ref = doc(db, "events", id);
+      const responseData = status ? {
+        status,
+        preferences: prefs || preferences,
+        updatedAt: new Date().toISOString(),
+      } : null;
+      
+      await updateDoc(ref, {
+        [`responses.${user.uid}`]: responseData,
+      });
+      
+      setResponses(prev => ({
+        ...prev,
+        [user.uid]: responseData,
+      }));
+      setMyStatus(status);
+      
+      if (status === "available") {
+        showToast("You're in! 🎉");
+        triggerConfetti();
+      }
+      setShowRSVPModal(false);
+    } catch (err) {
+      console.error("Error updating response:", err);
+      showToast("Failed to update", "error");
+    }
+    setSavingResponse(false);
+  }
+
+  // Save event edits
+  async function saveEdits() {
+    try {
+      const ref = doc(db, "events", id);
+      await updateDoc(ref, {
+        title: form.title,
+        notes: form.notes,
+        courseName: form.courseName,
+        courseAddress: form.courseAddress,
+        coursePlaceId: form.coursePlaceId,
+        coursePhotoUrl: form.coursePhotoUrl,
+        courseLat: form.courseLat || null,  // Add this
+        courseLng: form.courseLng || null,  // Add this
+        tee: form.tee,
+        rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline) : null,
+      });
+      
+      setEvent(prev => ({
+        ...prev,
+        ...form,
+        rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline) : null,
+      }));
+      setEditing(false);
+      showToast("Event updated!");
+    } catch (err) {
+      console.error("Error saving event:", err);
+      showToast("Failed to save", "error");
+    }
+  }
 
   // Delete event
-  const deleteEvent = async () => {
-    if (!event) return;
-    if (!confirm("Are you sure you want to delete this event?")) return;
-    
-    hapticFeedback('heavy');
-    
+  async function deleteEvent() {
     try {
-      await deleteDoc(doc(db, "events", event.id));
-      showToast("Event deleted", 'default');
+      await deleteDoc(doc(db, "events", id));
       navigate("/");
+      showToast("Event deleted");
     } catch (err) {
-      console.error("Error deleting:", err);
-      showToast("Failed to delete", 'error');
+      console.error("Error deleting event:", err);
+      showToast("Failed to delete", "error");
     }
-  };
+  }
+
+  // Toggle booked status
+  async function toggleBooked() {
+    try {
+      const ref = doc(db, "events", id);
+      await updateDoc(ref, { booked: !event.booked });
+      setEvent(prev => ({ ...prev, booked: !prev.booked }));
+      showToast(event.booked ? "Marked as proposed" : "Marked as booked! ✓");
+    } catch (err) {
+      console.error("Error toggling booked:", err);
+    }
+  }
 
   // Share event
-  const shareEvent = async () => {
-    hapticFeedback('light');
-    
-    const date = event.date?.toDate?.();
-    const dateStr = formatEventDate(date);
-    const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : import.meta.env.BASE_URL);
-    const eventUrl = `${baseUrl}/event/${event.id}`;
-    
-    const playerNames = confirmedIds.map(uid => getUserName(uid)).join(', ');
-    
-    let msg = `⛳ Golf - ${event.booked ? "Booked" : "Proposed"}!\n`;
-    msg += `📅 ${event.title || dateStr}\n`;
+  async function shareEvent() {
+    const date = event.date?.toDate ? event.date.toDate() : null;
+    const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
+    const eventUrl = window.location.href;
+
+    let msg = `⛳ *${event.title || "Golf round"}*\n`;
+    if (dateStr) msg += `📅 ${dateStr}\n`;
     if (event.tee) msg += `🕐 ${event.tee}\n`;
     if (event.courseName) msg += `📍 ${event.courseName}\n`;
-    if (playerNames) msg += `🏌️ ${playerNames}\n`;
-    if (event.notes) msg += `\n📝 ${event.notes}\n`;
     msg += `\n🔗 ${eventUrl}`;
-    
-    if (event.booked) {
-      msg += `\n\n📅 Add to Calendar:\n${buildGoogleCalendarUrl(event, eventUrl)}`;
-    }
-    
+
     try {
       await navigator.clipboard.writeText(msg);
-      showToast("Copied to clipboard! 📋", 'success');
+      showToast("Copied to clipboard! 📋");
     } catch {
-      showToast("Could not copy", 'error');
+      showToast("Could not copy", "error");
     }
-  };
+  }
 
-// Add to calendar
-const handleAddToCalendar = () => {
-  hapticFeedback('light');
-  const baseUrl = window.location.origin + (window.location.pathname.includes('/golfgang') ? '/golfgang' : import.meta.env.BASE_URL);
-  const eventUrl = `${baseUrl}/event/${event.id}`;
-  const calendarUrl = buildGoogleCalendarUrl(event, eventUrl);
-  window.open(calendarUrl, '_blank');
-};
+  // Confetti effect
+  function triggerConfetti() {
+    const colors = ['#10b981', '#0f7b6c', '#fbbf24', '#f59e0b'];
+    for (let i = 0; i < 50; i++) {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      confetti.style.left = Math.random() * 100 + 'vw';
+      confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      confetti.style.animationDelay = Math.random() * 0.5 + 's';
+      document.body.appendChild(confetti);
+      setTimeout(() => confetti.remove(), 3000);
+    }
+  }
 
-  // Summarize preferences
-  const getPreferencesSummary = () => {
-    const allPrefs = Object.entries(responses)
-      .filter(([_, r]) => getResponseStatus(r) === 'available')
-      .map(([uid, r]) => ({
-        uid,
-        name: getUserName(uid),
-        prefs: getResponsePreferences(r),
-      }))
-      .filter(p => p.prefs);
-
-    if (allPrefs.length === 0) return null;
-
-    const summary = {
-      time: {},
-      cart: {},
-      format: {},
-    };
-
-    allPrefs.forEach(p => {
-      if (p.prefs.timePreference) {
-        summary.time[p.prefs.timePreference] = (summary.time[p.prefs.timePreference] || 0) + 1;
-      }
-      if (p.prefs.cartPreference) {
-        summary.cart[p.prefs.cartPreference] = (summary.cart[p.prefs.cartPreference] || 0) + 1;
-      }
-      if (p.prefs.formatPreference) {
-        summary.format[p.prefs.formatPreference] = (summary.format[p.prefs.formatPreference] || 0) + 1;
-      }
-    });
-
-    return { summary, allPrefs };
-  };
-
-  if (loading) {
+  if (loadingEvent || loadingUsers) {
     return (
       <div className="page">
-        <div className="page-content">
-          <div className="skeleton" style={{ height: 32, width: '60%', marginBottom: 16 }}></div>
-          <div className="skeleton" style={{ height: 120, marginBottom: 16 }}></div>
-          <div className="skeleton" style={{ height: 80 }}></div>
+        <div className="ep-loading">
+          <div className="spinner"></div>
+          <p>Loading event...</p>
         </div>
       </div>
     );
@@ -344,537 +290,591 @@ const handleAddToCalendar = () => {
   if (!event) {
     return (
       <div className="page">
-        <div className="page-content">
-          <div className="card">
-            <div className="empty-state">
-              <div className="empty-state-icon">🔍</div>
-              <div className="empty-state-title">Event not found</div>
-              <Link to="/" className="btn btn-primary" style={{ marginTop: 16 }}>
-                Back to Home
-              </Link>
-            </div>
-          </div>
+        <div className="ep-not-found">
+          <span className="ep-not-found-icon">⛳</span>
+          <h2>Event not found</h2>
+          <p>This event may have been deleted.</p>
+          <Link to="/" className="btn btn-primary">Back to Home</Link>
         </div>
       </div>
     );
   }
 
-  const date = event.date?.toDate?.();
-  const dateStr = formatEventDate(date);
-  const prefsSummary = getPreferencesSummary();
+  // Helper functions
+  const getResponseStatus = (response) => {
+    if (!response) return null;
+    if (typeof response === 'string') return response;
+    return response.status;
+  };
+
+  const getResponsePreferences = (response) => {
+    if (!response || typeof response === 'string') return {};
+    return response.preferences || {};
+  };
+
+  // Sort attendees by RSVP time
+  const allAttendingIds = Object.entries(responses)
+    .filter(([_, response]) => getResponseStatus(response) === "available")
+    .sort(([, a], [, b]) => {
+      const aTime = typeof a === 'object' && a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const bTime = typeof b === 'object' && b?.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return aTime - bTime;
+    })
+    .map(([uid]) => uid);
+
+  const confirmedIds = allAttendingIds.slice(0, MAX_PLAYERS);
+  const reserveIds = allAttendingIds.slice(MAX_PLAYERS);
+  const isUserReserve = user && reserveIds.includes(user.uid);
+  const isUserConfirmed = user && confirmedIds.includes(user.uid);
+  const declinedIds = Object.entries(responses)
+    .filter(([_, response]) => getResponseStatus(response) === "unavailable")
+    .map(([uid]) => uid);
+
+  const getUserName = (uid) => {
+    const u = allUsers.find((x) => x.id === uid);
+    return u?.username || u?.email?.split("@")[0] || "Unknown";
+  };
+
+  const getUserInitials = (uid) => {
+    const name = getUserName(uid);
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Date formatting
+  const date = event.date?.toDate ? event.date.toDate() : null;
+  const dateStr = date?.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) || "";
+  const shortDate = date?.toLocaleDateString("en-AU", { day: "numeric", month: "short" }) || "";
+  const dayName = date?.toLocaleDateString("en-AU", { weekday: "short" }) || "";
+  
+  const mapsUrl = buildGoogleMapsUrl(event.coursePlaceId, event.courseName);
+  const eventUrl = window.location.href;
+  const hasCourseInfo = event.coursePlaceId || event.courseName;
+
+  // Aggregate preferences for group summary
+  const aggregatePreferences = () => {
+    const prefs = { time: {}, cart: {}, format: {} };
+    confirmedIds.forEach(uid => {
+      const p = getResponsePreferences(responses[uid]);
+      if (p.timePreference) prefs.time[p.timePreference] = (prefs.time[p.timePreference] || 0) + 1;
+      if (p.cartPreference) prefs.cart[p.cartPreference] = (prefs.cart[p.cartPreference] || 0) + 1;
+      if (p.formatPreference) prefs.format[p.formatPreference] = (prefs.format[p.formatPreference] || 0) + 1;
+    });
+    return prefs;
+  };
+
+  const groupPrefs = aggregatePreferences();
 
   return (
-    <div className="page">
-      <div className="page-content">
-        {/* Back link */}
-        <Link to="/" className="back-link">← Back to rounds</Link>
+    <div className="page ep-page">
+      {/* Back link - subtle at top */}
+      <Link to="/" className="ep-back-link">
+        ← Back to rounds
+      </Link>
 
-        {/* Event Header */}
-        <div className="event-header">
-          <h1 className="event-title">{event.title || "Golf Round"}</h1>
-          <div className="event-status">
-            {event.booked ? (
-              <span className="badge badge-success">✓ Booked</span>
-            ) : (
-              <span className="badge badge-info">Proposed</span>
-            )}
+      {/* HERO SECTION with course photo */}
+      <div className="ep-hero">
+        {hasCourseInfo ? (
+          <div className="ep-hero-image">
+            {/* Gradient background - replace with actual photo component if you have PlacePhoto */}
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #0f7b6c 0%, #10b981 50%, #059669 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 64, opacity: 0.3 }}>⛳</span>
+            </div>
+            <div className="ep-hero-overlay" />
           </div>
-        </div>
-
-        {/* Event Details Card */}
-        <div className="card">
-          {!editing ? (
-            <div className="event-details">
-              <div className="event-detail">
-                <span className="event-detail-icon">📅</span>
-                <span>{dateStr}</span>
-              </div>
-              <div className="event-detail">
-                <span className="event-detail-icon">🕐</span>
-                <span>{event.tee || "Time TBA"}</span>
-              </div>
-              <div className="event-detail">
-                <span className="event-detail-icon">📍</span>
-                <span>{event.courseName || "Course TBA"}</span>
-              </div>
-              <div className="event-detail">
-                <span className="event-detail-icon">👥</span>
-                <span>{confirmedIds.length}/{MAX_PLAYERS} players</span>
-              </div>
-              {event.notes && (
-                <div className="event-detail event-notes">
-                  <span className="event-detail-icon">📝</span>
-                  <span>{event.notes}</span>
-                </div>
-              )}
-              
-              <div className="event-actions">
-                <button className="btn btn-ghost btn-sm" onClick={shareEvent}>
-                  Share
-                </button>
-
-                <button className="btn btn-ghost btn-sm" onClick={handleAddToCalendar}>
-                  📅 Add to Calendar
-                </button>
-
-                {canEdit && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
-                    Edit
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="event-edit-form">
-              <div className="form-group">
-                <label>Tee Time</label>
-                <input
-                  type="time"
-                  className="input"
-                  value={form.tee}
-                  onChange={(e) => setForm({ ...form, tee: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <label>Course</label>
-                <CourseSearch
-                  value={form.courseName}
-                  onChange={(course) => setForm({ 
-                    ...form, 
-                    courseName: course.name,
-                    coursePlaceId: course.placeId || ''
-                  })}
-                  placeholder="Search for a golf course..."
-                />
-              </div>
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea
-                  className="input"
-                  rows={2}
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Additional details..."
-                />
-              </div>
-              <div className="form-actions">
-                <button className="btn btn-ghost" onClick={() => setEditing(false)}>
-                  Cancel
-                </button>
-                <button className="btn btn-primary" onClick={saveEdits} disabled={saving}>
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-<GolfConditions event={event} />
-
-        {/* RSVP Section */}
-{!event.booked && (
-  <div className="card">
-    <h3 className="card-title" style={{ marginBottom: 20 }}>Are you in?</h3>
-    
-    {/* Warning if group is full */}
-    {confirmedIds.length >= MAX_PLAYERS && !myStatus && (
-      <div className="toast toast-warning">
-        ⚠️ Group is full — you'll be on the reserve list
-      </div>
-    )}
-
-    {/* Show current status if already responded */}
-    {myStatus && !showRsvpForm && (
-      <div className="current-rsvp">
-        <div className={`rsvp-status ${myStatus === 'available' ? 'rsvp-status-in' : 'rsvp-status-out'}`}>
-          {myStatus === 'available' ? (
-            <>
-              <span style={{ fontSize: 18 }}>✓</span>
-              <span>You're in!</span>
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: 18 }}>✗</span>
-              <span>Can't make it</span>
-            </>
-          )}
-        </div>
-        
-        {/* Show user's preferences if they're available */}
-        {myPreferences && myStatus === 'available' && (
-          <div className="my-preferences">
-            {myPreferences.timePreference && (
-              <span className="pref-tag">⏰ {myPreferences.timePreference}</span>
-            )}
-            {myPreferences.cartPreference && (
-              <span className="pref-tag">🚶 {myPreferences.cartPreference}</span>
-            )}
-            {myPreferences.formatPreference && (
-              <span className="pref-tag">⛳ {myPreferences.formatPreference}</span>
-            )}
+        ) : (
+          <div className="ep-hero-placeholder">
+            <span>⛳</span>
           </div>
         )}
         
-        <button 
-          className="btn btn-ghost btn-sm"
-          onClick={() => setShowRsvpForm(true)}
-          style={{ marginTop: 16 }}
-        >
-          Change Response
-        </button>
+        {/* Status badge */}
+        <div className="ep-hero-badge">
+          <span className={`ep-status-badge ${event.booked ? 'booked' : 'proposed'}`}>
+            {event.booked ? '✓ Booked' : 'Proposed'}
+          </span>
+        </div>
+
+        {/* Title overlay */}
+        <div className="ep-hero-content">
+          <h1 className="ep-title">{dateStr}</h1>
+        </div>
+
+        {/* Quick action buttons - floating */}
+        <div className="ep-hero-actions">
+          <button className="ep-fab" onClick={shareEvent} title="Share">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+            </svg>
+          </button>
+          <CalendarMenu event={event} eventUrl={eventUrl} />
+        </div>
       </div>
-    )}
 
-    {/* RSVP Form */}
-    {(!myStatus || showRsvpForm) && (
-      <div className="rsvp-form">
-        {/* Preferences Section */}
-        <div className="preferences-section">
-          <h4 className="preferences-title">Your Preferences (Optional)</h4>
+      {/* COMPACT INFO BAR */}
+      <div className="ep-info-bar">
+        <div className="ep-info-grid">
+          <div className="ep-info-item">
+            <svg className="ep-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            <span className="ep-info-value">{event.tee || "TBA"}</span>
+            <span className="ep-info-label">Tee Time</span>
+          </div>
           
-          {/* Time Preference */}
-          <div className="form-group">
-            <label>⏰ Time Preference</label>
-            <div className="toggle-group">
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.timePreference === 'AM' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  timePreference: rsvpPreferences.timePreference === 'AM' ? '' : 'AM' 
-                })}
-              >
-                ☀️ AM
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.timePreference === 'PM' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  timePreference: rsvpPreferences.timePreference === 'PM' ? '' : 'PM' 
-                })}
-              >
-                🌙 PM
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.timePreference === 'Any' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  timePreference: rsvpPreferences.timePreference === 'Any' ? '' : 'Any' 
-                })}
-              >
-                ⏱️ Any
-              </button>
-            </div>
+          <div className="ep-info-item ep-info-item-course">
+            <svg className="ep-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            {event.courseName ? (
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="ep-info-value ep-course-link">
+                {event.courseName}
+                <span className="ep-link-arrow">↗</span>
+              </a>
+            ) : (
+              <span className="ep-info-value">TBA</span>
+            )}
+            <span className="ep-info-label">Course</span>
           </div>
-
-          {/* Walk or Cart */}
-          <div className="form-group">
-            <label>🚶 Walk or Cart?</label>
-            <div className="toggle-group">
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.cartPreference === 'Walk' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  cartPreference: rsvpPreferences.cartPreference === 'Walk' ? '' : 'Walk' 
-                })}
-              >
-                🚶 Walk
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.cartPreference === 'Cart' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  cartPreference: rsvpPreferences.cartPreference === 'Cart' ? '' : 'Cart' 
-                })}
-              >
-                🛒 Cart
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.cartPreference === 'Any' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  cartPreference: rsvpPreferences.cartPreference === 'Any' ? '' : 'Any' 
-                })}
-              >
-                ✨ Any
-              </button>
-            </div>
+          
+          <div className="ep-info-item">
+            <svg className="ep-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            <span className="ep-info-value">{confirmedIds.length}/{MAX_PLAYERS}</span>
+            <span className="ep-info-label">Players</span>
           </div>
+        </div>
 
-          {/* Game Format */}
-          <div className="form-group">
-            <label>⛳ Game Format</label>
-            <div className="toggle-group">
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.formatPreference === 'Stroke' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  formatPreference: rsvpPreferences.formatPreference === 'Stroke' ? '' : 'Stroke' 
-                })}
-              >
-                🎯 Stroke
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.formatPreference === 'Scramble' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  formatPreference: rsvpPreferences.formatPreference === 'Scramble' ? '' : 'Scramble' 
-                })}
-              >
-                🤝 Scramble
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${rsvpPreferences.formatPreference === 'Any' ? 'active' : ''}`}
-                onClick={() => setRsvpPreferences({ 
-                  ...rsvpPreferences, 
-                  formatPreference: rsvpPreferences.formatPreference === 'Any' ? '' : 'Any' 
-                })}
-              >
-                ✨ Any
-              </button>
-            </div>
+        {event.notes && (
+          <div className="ep-notes">
+            <span className="ep-notes-icon">📝</span>
+            {event.notes}
           </div>
+        )}
 
-          {/* Course Preference */}
+        {/* Admin quick actions */}
+        {(isAdmin || event.createdBy === user?.uid) && !editing && (
+          <div className="ep-admin-bar">
+            <button className="ep-admin-btn" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+            <button className="ep-admin-btn" onClick={toggleBooked}>
+              {event.booked ? 'Mark Proposed' : 'Mark Booked'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* EDITING MODE */}
+      {editing && (
+        <div className="ep-card ep-edit-card">
+          <h3 className="ep-card-title">Edit Event</h3>
+          
           <div className="form-group">
-            <label>📍 Course Preference</label>
+            <label>Tee Time</label>
             <input
-              type="text"
+              type="time"
               className="input"
-              value={rsvpPreferences.coursePreference}
-              onChange={(e) => setRsvpPreferences({ 
-                ...rsvpPreferences, 
-                coursePreference: e.target.value 
-              })}
-              placeholder="e.g., Somewhere close to CBD"
+              value={form.tee}
+              onChange={(e) => setForm({ ...form, tee: e.target.value })}
             />
           </div>
+
+          <div className="form-group">
+            <label>Course</label>
+            <CourseAutocomplete
+              value={form.courseName}
+              onSelect={(place) => {
+                setForm({
+                  ...form,
+                  courseName: place.name,
+                  courseAddress: place.address,
+                  coursePlaceId: place.placeId,
+                  courseLat: place.lat || null,
+                  courseLng: place.lng || null,
+                });
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Any additional details..."
+            />
+          </div>
+
+          <div className="ep-edit-actions">
+            <button className="btn btn-ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={saveEdits}>
+              Save Changes
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="rsvp-actions">
-          <button
-            className="rsvp-action-btn btn-available"
-            onClick={() => handleRSVP('available')}
+      {/* WEATHER CONDITIONS - Collapsible */}
+      {hasCourseInfo && date && (
+        <div className="ep-card ep-weather-card">
+          <button 
+            className="ep-collapse-header"
+            onClick={() => setWeatherExpanded(!weatherExpanded)}
           >
-            <span style={{ fontSize: 18 }}>✓</span>
-            <span>I'm in</span>
+            <span className="ep-collapse-title">
+              <span className="ep-collapse-icon">🌤️</span>
+              Golf Conditions
+            </span>
+            <span className={`ep-collapse-arrow ${weatherExpanded ? 'expanded' : ''}`}>
+              ▼
+            </span>
           </button>
-          <button
-            className="rsvp-action-btn btn-unavailable"
-            onClick={() => handleRSVP('unavailable')}
-          >
-            <span style={{ fontSize: 18 }}>✗</span>
-            <span>Can't make it</span>
-          </button>
+          
+          {weatherExpanded ? (
+            <div className="ep-collapse-content">
+              <GolfConditions
+                lat={event.courseLat}
+                lng={event.courseLng}
+                date={date}
+                coursePlaceId={event.coursePlaceId}
+              />
+            </div>
+          ) : (
+            <GolfConditions
+              lat={event.courseLat}
+              lng={event.courseLng}
+              date={date}
+              coursePlaceId={event.coursePlaceId}
+              compact={true}
+            />
+          )}
         </div>
+      )}
 
-        {/* Cancel button if editing existing response */}
-        {showRsvpForm && myStatus && (
-          <button
-            className="btn btn-ghost btn-full"
-            onClick={() => setShowRsvpForm(false)}
-            style={{ marginTop: 12 }}
-          >
-            Cancel
-          </button>
-        )}
-      </div>
-    )}
-  </div>
-)}
-
-{/* Confirmed status for booked events */}
-{event.booked && myStatus === 'available' && (
-  <div className="card card-success">
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: 20 }}>✓</span>
-      <span style={{ fontWeight: 600 }}>You're confirmed for this round</span>
-    </div>
-  </div>
-)}
-
-{/* Players List - ALWAYS VISIBLE */}
-<div className="card">
-  <h3 className="card-title">Players ({confirmedIds.length}/{MAX_PLAYERS})</h3>
-  
-  {confirmedIds.length === 0 ? (
-    <p className="text-secondary">No one has RSVP'd yet</p>
-  ) : (
-    <div className="player-list">
-      {confirmedIds.map((uid) => {
-        const name = getUserName(uid);
-        const style = getAvatarStyle(name);
-        const isMe = uid === user?.uid;
-        const playerPrefs = getResponsePreferences(responses[uid]);
-        
-        return (
-          <div key={uid} className="player-item">
-            <div className="player-info">
-              <div 
-                className="avatar"
-                style={{ backgroundColor: style.bg, color: style.text }}
-              >
-                {getInitials(name)}
-              </div>
-              <div className="player-details">
-                <span className="player-name">
-                  {name} {isMe && <span className="text-secondary">(you)</span>}
-                </span>
-                {playerPrefs && (
-                  <div className="player-prefs">
-                    {playerPrefs.timePreference && <span className="pref-mini">{playerPrefs.timePreference}</span>}
-                    {playerPrefs.cartPreference && <span className="pref-mini">{playerPrefs.cartPreference}</span>}
-                    {playerPrefs.formatPreference && <span className="pref-mini">{playerPrefs.formatPreference}</span>}
-                  </div>
+      {/* RSVP STATUS / ACTIONS */}
+      {!editing && (
+        <div className="ep-card ep-rsvp-card">
+          {myStatus === "available" ? (
+            <div className={`ep-status-banner ${isUserReserve ? 'reserve' : 'confirmed'}`}>
+              <span className="ep-status-icon">
+                {isUserReserve ? '🔔' : '✓'}
+              </span>
+              <div className="ep-status-text">
+                <strong>
+                  {isUserReserve ? "You're on the reserve list" : "You're confirmed for this round"}
+                </strong>
+                {isUserReserve && (
+                  <span className="ep-status-sub">Position {reserveIds.indexOf(user.uid) + 1} in queue</span>
                 )}
               </div>
-            </div>
-            {isAdmin && !isMe && (
               <button 
-                className="btn btn-ghost btn-sm btn-danger"
-                onClick={() => removePlayer(uid)}
+                className="ep-status-action"
+                onClick={() => setShowRSVPModal(true)}
               >
-                Remove
+                Edit
               </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  )}
-  
-  {/* Unavailable Players */}
-  {unavailableIds.length > 0 && (
-    <>
-      <h4 className="card-subtitle" style={{ marginTop: 20, marginBottom: 12, fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-        Can't make it
-      </h4>
-      <div className="player-list player-list-unavailable">
-        {unavailableIds.map((uid) => {
-          const name = getUserName(uid);
-          const style = getAvatarStyle(name);
-          return (
-            <div key={uid} className="player-item">
-              <div className="player-info">
+            </div>
+          ) : myStatus === "unavailable" ? (
+            <div className="ep-status-banner declined">
+              <span className="ep-status-icon">✗</span>
+              <span className="ep-status-text"><strong>You declined this round</strong></span>
+              <button 
+                className="ep-status-action"
+                onClick={() => updateResponse("available")}
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="ep-rsvp-buttons">
+              <button
+                className="ep-rsvp-btn ep-rsvp-in"
+                onClick={() => setShowRSVPModal(true)}
+                disabled={savingResponse}
+              >
+                <span className="ep-rsvp-emoji">🏌️</span>
+                I'm In
+              </button>
+              <button
+                className="ep-rsvp-btn ep-rsvp-out"
+                onClick={() => updateResponse("unavailable")}
+                disabled={savingResponse}
+              >
+                <span className="ep-rsvp-emoji">😔</span>
+                Can't Make It
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PLAYERS LIST */}
+      <div className="ep-card ep-players-card">
+        <h3 className="ep-card-title">
+          Players ({confirmedIds.length}/{MAX_PLAYERS})
+        </h3>
+        
+        <div className="ep-players-grid">
+          {/* Confirmed players */}
+          {confirmedIds.map((uid) => {
+            const prefs = getResponsePreferences(responses[uid]);
+            const isCurrentUser = uid === user?.uid;
+            return (
+              <div key={uid} className={`ep-player ${isCurrentUser ? 'current' : ''}`}>
                 <div 
-                  className="avatar avatar-muted"
-                  style={{ backgroundColor: '#e5e7eb', color: '#6b7280' }}
+                  className="ep-player-avatar"
+                  style={{ backgroundColor: `hsl(${uid.charCodeAt(0) * 10}, 60%, 70%)` }}
                 >
-                  {getInitials(name)}
+                  {getUserInitials(uid)}
                 </div>
-                <span className="player-name text-secondary">{name}</span>
+                <div className="ep-player-info">
+                  <span className="ep-player-name">
+                    {getUserName(uid)}
+                    {isCurrentUser && <span className="ep-you-tag">(you)</span>}
+                  </span>
+                  {(prefs.timePreference || prefs.cartPreference || prefs.formatPreference) && (
+                    <div className="ep-player-prefs">
+                      {prefs.timePreference && <span className="ep-pref-tag">{prefs.timePreference}</span>}
+                      {prefs.cartPreference && <span className="ep-pref-tag">{prefs.cartPreference}</span>}
+                      {prefs.formatPreference && <span className="ep-pref-tag">{prefs.formatPreference}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          
+          {/* Empty slots */}
+          {Array.from({ length: MAX_PLAYERS - confirmedIds.length }).map((_, i) => (
+            <div key={`empty-${i}`} className="ep-player ep-player-empty">
+              <div className="ep-player-avatar empty">
+                <span>?</span>
+              </div>
+              <span className="ep-player-name">Open spot</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Reserve list */}
+        {reserveIds.length > 0 && (
+          <div className="ep-reserve-section">
+            <h4 className="ep-reserve-title">Reserve List</h4>
+            <div className="ep-reserve-list">
+              {reserveIds.map((uid, idx) => (
+                <div key={uid} className="ep-reserve-player">
+                  <span className="ep-reserve-position">#{idx + 1}</span>
+                  <div 
+                    className="ep-player-avatar small"
+                    style={{ backgroundColor: `hsl(${uid.charCodeAt(0) * 10}, 60%, 70%)` }}
+                  >
+                    {getUserInitials(uid)}
+                  </div>
+                  <span>{getUserName(uid)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* GROUP PREFERENCES - Collapsible */}
+      {confirmedIds.length > 0 && (
+        <div className="ep-card ep-prefs-card">
+          <button 
+            className="ep-collapse-header"
+            onClick={() => setPrefsExpanded(!prefsExpanded)}
+          >
+            <span className="ep-collapse-title">
+              <span className="ep-collapse-icon">📊</span>
+              Group Preferences
+            </span>
+            <span className={`ep-collapse-arrow ${prefsExpanded ? 'expanded' : ''}`}>
+              ▼
+            </span>
+          </button>
+          
+          {prefsExpanded && (
+            <div className="ep-collapse-content ep-prefs-content">
+              {Object.keys(groupPrefs.time).length > 0 && (
+                <div className="ep-pref-row">
+                  <span className="ep-pref-label">Time:</span>
+                  <div className="ep-pref-values">
+                    {Object.entries(groupPrefs.time).map(([pref, count]) => (
+                      <span key={pref} className="ep-pref-chip">{pref} ({count})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Object.keys(groupPrefs.cart).length > 0 && (
+                <div className="ep-pref-row">
+                  <span className="ep-pref-label">Transport:</span>
+                  <div className="ep-pref-values">
+                    {Object.entries(groupPrefs.cart).map(([pref, count]) => (
+                      <span key={pref} className="ep-pref-chip">{pref} ({count})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Object.keys(groupPrefs.format).length > 0 && (
+                <div className="ep-pref-row">
+                  <span className="ep-pref-label">Format:</span>
+                  <div className="ep-pref-values">
+                    {Object.entries(groupPrefs.format).map(([pref, count]) => (
+                      <span key={pref} className="ep-pref-chip">{pref} ({count})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Object.keys(groupPrefs.time).length === 0 && 
+               Object.keys(groupPrefs.cart).length === 0 && 
+               Object.keys(groupPrefs.format).length === 0 && (
+                <p className="ep-no-prefs">No preferences set yet</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ACTIONS - Destructive at bottom */}
+      {(myStatus === "available" || isAdmin || event.createdBy === user?.uid) && (
+        <div className="ep-card ep-actions-card">
+          <h3 className="ep-card-title">Actions</h3>
+          
+          {myStatus === "available" && (
+            <button 
+              className="ep-action-btn ep-action-remove"
+              onClick={() => updateResponse(null)}
+            >
+              Remove Booking
+            </button>
+          )}
+          
+          {(isAdmin || event.createdBy === user?.uid) && (
+            <>
+              {!showDeleteConfirm ? (
+                <button 
+                  className="ep-action-btn ep-action-delete"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete Event
+                </button>
+              ) : (
+                <div className="ep-delete-confirm">
+                  <p>Are you sure? This cannot be undone.</p>
+                  <div className="ep-delete-actions">
+                    <button 
+                      className="btn btn-ghost"
+                      onClick={() => setShowDeleteConfirm(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      className="btn btn-danger"
+                      onClick={deleteEvent}
+                    >
+                      Yes, Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* RSVP MODAL */}
+      {showRSVPModal && (
+        <div className="ep-modal-overlay" onClick={() => setShowRSVPModal(false)}>
+          <div className="ep-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="ep-modal-title">Set Your Preferences</h3>
+            
+            <div className="ep-modal-content">
+              {/* Time Preference */}
+              <div className="ep-pref-group">
+                <label>Preferred Time</label>
+                <div className="ep-toggle-group">
+                  {['AM', 'PM', 'Any'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      className={`ep-toggle-btn ${preferences.timePreference === opt ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, timePreference: opt })}
+                    >
+                      {opt === 'AM' ? '🌅' : opt === 'PM' ? '🌇' : '🤷'} {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cart Preference */}
+              <div className="ep-pref-group">
+                <label>Walk or Cart?</label>
+                <div className="ep-toggle-group">
+                  {['Walk', 'Cart', 'Any'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      className={`ep-toggle-btn ${preferences.cartPreference === opt ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, cartPreference: opt })}
+                    >
+                      {opt === 'Walk' ? '🚶' : opt === 'Cart' ? '🚗' : '🤷'} {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Format Preference */}
+              <div className="ep-pref-group">
+                <label>Game Format</label>
+                <div className="ep-toggle-group">
+                  {['Stroke', 'Scramble', 'Any'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      className={`ep-toggle-btn ${preferences.formatPreference === opt ? 'active' : ''}`}
+                      onClick={() => setPreferences({ ...preferences, formatPreference: opt })}
+                    >
+                      {opt === 'Stroke' ? '🎯' : opt === 'Scramble' ? '👥' : '🤷'} {opt}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          );
-        })}
-      </div>
-    </>
-  )}
-</div>
 
-{/* Group Preferences Summary */}
-{prefsSummary && confirmedIds.length > 0 && (
-  <div className="card">
-    <h3 className="card-title">Group Preferences</h3>
-    
-    <div className="prefs-summary">
-      {/* Time Summary */}
-      {Object.keys(prefsSummary.summary.time).length > 0 && (
-        <div className="prefs-row">
-          <span className="prefs-label">⏰ Time:</span>
-          <div className="prefs-values">
-            {Object.entries(prefsSummary.summary.time).map(([pref, count]) => (
-              <span key={pref} className="pref-chip">{pref} ({count})</span>
-            ))}
+            <div className="ep-modal-actions">
+              <button 
+                className="btn btn-ghost" 
+                onClick={() => setShowRSVPModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-success" 
+                onClick={() => updateResponse("available", preferences)}
+                disabled={savingResponse}
+              >
+                {savingResponse ? "Saving..." : myStatus === "available" ? "Update" : "Confirm I'm In"}
+              </button>
+            </div>
           </div>
         </div>
       )}
-      
-      {/* Cart Summary */}
-      {Object.keys(prefsSummary.summary.cart).length > 0 && (
-        <div className="prefs-row">
-          <span className="prefs-label">🚶 Transport:</span>
-          <div className="prefs-values">
-            {Object.entries(prefsSummary.summary.cart).map(([pref, count]) => (
-              <span key={pref} className="pref-chip">{pref} ({count})</span>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* Format Summary */}
-      {Object.keys(prefsSummary.summary.format).length > 0 && (
-        <div className="prefs-row">
-          <span className="prefs-label">⛳ Format:</span>
-          <div className="prefs-values">
-            {Object.entries(prefsSummary.summary.format).map(([pref, count]) => (
-              <span key={pref} className="pref-chip">{pref} ({count})</span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Course preferences (individual) */}
-      {prefsSummary.allPrefs.some(p => p.prefs?.coursePreference) && (
-        <div className="prefs-row prefs-row-courses">
-          <span className="prefs-label">📍 Courses:</span>
-          <div className="prefs-courses">
-            {prefsSummary.allPrefs
-              .filter(p => p.prefs?.coursePreference)
-              .map(p => (
-                <div key={p.uid} className="pref-course">
-                  <span className="pref-course-name">{p.name}:</span>
-                  <span className="pref-course-value">{p.prefs.coursePreference}</span>
-                </div>
-              ))
-            }
-          </div>
-        </div>
-      )}
-    </div>
-  </div>
-)}
-
-{/* Admin Actions */}
-{canEdit && (
-  <div className="card">
-    <h3 className="card-title">Actions</h3>
-    <div className="admin-actions">
-      {!event.booked ? (
-        <button 
-          className="btn btn-success btn-full"
-          onClick={markBooked}
-          disabled={confirmedIds.length === 0}
-        >
-          ✓ Mark as Booked
-        </button>
-      ) : (
-        <button 
-          className="btn btn-ghost btn-full"
-          onClick={unmarkBooked}
-        >
-          Remove Booking
-        </button>
-      )}
-      <button 
-        className="btn btn-danger btn-full"
-        onClick={deleteEvent}
-      >
-        Delete Event
-      </button>
-    </div>
-  </div>
-)}
-      </div>
     </div>
   );
 }

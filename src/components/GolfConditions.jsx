@@ -1,145 +1,244 @@
-import { useState, useEffect } from 'react';
-import { 
-  fetchWeatherData, 
-  calculateGolfScore, 
-  getConditionMessage, 
-  getConditionEmoji 
-} from '../utils/weatherUtils';
-import './GolfConditions.css';
+import { useState, useEffect, useRef } from 'react'
 
-/**
- * Golf Conditions Component
- * Displays weather information and golf condition score for an event
- */
-export default function GolfConditions({ event }) {
-  const [weather, setWeather] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function CourseAutocomplete({ value, onSelect }) {
+  const [query, setQuery] = useState(value || '')
+  const [suggestions, setSuggestions] = useState([])
+  const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const wrapperRef = useRef(null)
+  const debounceRef = useRef(null)
 
+  // Close dropdown when clicking outside
   useEffect(() => {
-    async function loadWeather() {
-      if (!event?.date) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const eventDate = event.date.toDate ? event.date.toDate() : event.date;
-        const weatherData = await fetchWeatherData(
-          eventDate, 
-          event.coursePlaceId, 
-          event.courseName
-        );
-        
-        setWeather(weatherData);
-      } catch (err) {
-        console.error('Error loading weather:', err);
-        setError('Unable to load weather');
-      } finally {
-        setLoading(false);
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false)
       }
     }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-    loadWeather();
-  }, [event?.date, event?.coursePlaceId, event?.courseName]);
+  // Update query when value prop changes
+  useEffect(() => {
+    setQuery(value || '')
+  }, [value])
 
-  if (loading) {
-    return (
-      <div className="card golf-conditions-loading">
-        <div className="loading-spinner"></div>
-        <span>Loading conditions...</span>
-      </div>
-    );
+  // Search for golf courses using Google Places Autocomplete
+  const searchCourses = async (searchQuery) => {
+    if (!searchQuery || searchQuery.length < 3) {
+      setSuggestions([])
+      setIsOpen(false)
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      // Check if Google Maps API is loaded
+      if (window.google && window.google.maps && window.google.maps.places) {
+        const service = new window.google.maps.places.AutocompleteService()
+        
+        service.getPlacePredictions(
+          {
+            input: searchQuery,
+            types: ['establishment'],
+            // Bias towards golf-related places
+            componentRestrictions: { country: 'au' }, // Change to your country or remove for global
+          },
+          (predictions, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+              // Filter for golf-related places
+              const golfPlaces = predictions.filter(p => 
+                p.description.toLowerCase().includes('golf') ||
+                p.types?.includes('golf_course')
+              )
+              
+              // If no golf-specific results, show all results
+              const results = golfPlaces.length > 0 ? golfPlaces : predictions.slice(0, 5)
+              
+              setSuggestions(results.map(p => ({
+                name: p.structured_formatting?.main_text || p.description,
+                address: p.structured_formatting?.secondary_text || '',
+                placeId: p.place_id,
+                fullDescription: p.description,
+              })))
+              setIsOpen(true)
+            } else {
+              setSuggestions([])
+            }
+            setIsLoading(false)
+          }
+        )
+      } else {
+        // Fallback: Just use the typed value
+        console.warn('Google Maps API not loaded - using manual entry')
+        setSuggestions([])
+        setIsLoading(false)
+      }
+    } catch (err) {
+      console.error('Search error:', err)
+      setSuggestions([])
+      setIsLoading(false)
+    }
   }
 
-  if (error || !weather) {
-    return null; // Silently fail - weather is optional
+  const handleInputChange = (e) => {
+    const newValue = e.target.value
+    setQuery(newValue)
+
+    // Debounce the search
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+    debounceRef.current = setTimeout(() => {
+      searchCourses(newValue)
+    }, 300)
   }
 
-  const score = calculateGolfScore(weather);
-  const message = getConditionMessage(score);
-  const emoji = getConditionEmoji(score);
+  const handleSelect = (suggestion) => {
+    setQuery(suggestion.name)
+    setIsOpen(false)
+    setSuggestions([])
+
+    // Get place details for coordinates
+    if (window.google && window.google.maps && window.google.maps.places && suggestion.placeId) {
+      const service = new window.google.maps.places.PlacesService(
+        document.createElement('div')
+      )
+      
+      service.getDetails(
+        {
+          placeId: suggestion.placeId,
+          fields: ['name', 'formatted_address', 'geometry', 'place_id'],
+        },
+        (place, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+            onSelect({
+              name: place.name || suggestion.name,
+              address: place.formatted_address || suggestion.address,
+              placeId: place.place_id || suggestion.placeId,
+              lat: place.geometry?.location?.lat(),
+              lng: place.geometry?.location?.lng(),
+            })
+          } else {
+            onSelect({
+              name: suggestion.name,
+              address: suggestion.address,
+              placeId: suggestion.placeId,
+            })
+          }
+        }
+      )
+    } else {
+      onSelect({
+        name: suggestion.name,
+        address: suggestion.address,
+        placeId: suggestion.placeId,
+      })
+    }
+  }
+
+  const handleManualEntry = () => {
+    // Allow manual entry without selecting from dropdown
+    onSelect({
+      name: query,
+      address: '',
+      placeId: '',
+    })
+    setIsOpen(false)
+  }
 
   return (
-    <div className="card golf-conditions">
-      <h3 className="card-title">⛳ Golf Conditions</h3>
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <input
+        type="text"
+        className="input"
+        value={query}
+        onChange={handleInputChange}
+        onBlur={() => {
+          // Delay to allow click on suggestion
+          setTimeout(() => {
+            if (query && !isOpen) {
+              handleManualEntry()
+            }
+          }, 200)
+        }}
+        placeholder="Search for a golf course..."
+      />
       
-      {/* Main Score Display */}
-      <div className="conditions-score">
-        <div className="score-emoji">{emoji}</div>
-        <div className="score-details">
-          <div className="score-number">{score}/10</div>
-          <div className="score-message">{message}</div>
+      {isLoading && (
+        <div style={{ 
+          position: 'absolute', 
+          right: 12, 
+          top: '50%', 
+          transform: 'translateY(-50%)',
+        }}>
+          <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }}></div>
         </div>
-      </div>
-
-      {/* Weather Details Grid */}
-      <div className="weather-details">
-        <div className="weather-item">
-          <span className="weather-icon">🌡️</span>
-          <div className="weather-info">
-            <span className="weather-label">Temperature</span>
-            <span className="weather-value">{weather.temp}°C</span>
-            {weather.feelsLike !== weather.temp && (
-              <span className="weather-subvalue">Feels like {weather.feelsLike}°C</span>
-            )}
-          </div>
+      )}
+      
+      {isOpen && suggestions.length > 0 && (
+        <ul style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          marginTop: 4,
+          padding: 0,
+          listStyle: 'none',
+          zIndex: 100,
+          maxHeight: 250,
+          overflowY: 'auto',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        }}>
+          {suggestions.map((suggestion, index) => (
+            <li
+              key={suggestion.placeId || index}
+              onClick={() => handleSelect(suggestion)}
+              style={{
+                padding: '12px 14px',
+                cursor: 'pointer',
+                borderBottom: index < suggestions.length - 1 ? '1px solid var(--color-border-light)' : 'none',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ fontWeight: 500, fontSize: 14 }}>
+                ⛳ {suggestion.name}
+              </div>
+              {suggestion.address && (
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                  {suggestion.address}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      
+      {isOpen && suggestions.length === 0 && query.length >= 3 && !isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          marginTop: 4,
+          padding: '12px 14px',
+          zIndex: 100,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          fontSize: 14,
+          color: 'var(--color-text-secondary)',
+        }}>
+          No results found. Press Enter to use "{query}"
         </div>
-
-        <div className="weather-item">
-          <span className="weather-icon">💨</span>
-          <div className="weather-info">
-            <span className="weather-label">Wind</span>
-            <span className="weather-value">{weather.windSpeed} km/h</span>
-            {weather.windGust && (
-              <span className="weather-subvalue">Gusts to {weather.windGust} km/h</span>
-            )}
-          </div>
-        </div>
-
-        <div className="weather-item">
-          <span className="weather-icon">☔</span>
-          <div className="weather-info">
-            <span className="weather-label">Rain Chance</span>
-            <span className="weather-value">{weather.pop}%</span>
-          </div>
-        </div>
-
-        <div className="weather-item">
-          <span className="weather-icon">💧</span>
-          <div className="weather-info">
-            <span className="weather-label">Humidity</span>
-            <span className="weather-value">{weather.humidity}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Weather Description */}
-      <div className="weather-description">
-        <span className="weather-summary">{weather.description}</span>
-        {weather.isEstimate && (
-          <span className="weather-estimate">
-            (Seasonal average - beyond 5-day forecast)
-          </span>
-        )}
-      </div>
-
-      {/* Condition Breakdown */}
-      <details className="conditions-breakdown">
-        <summary>Score Breakdown</summary>
-        <div className="breakdown-content">
-          <p><strong>How the score is calculated:</strong></p>
-          <ul>
-            <li>🌡️ Ideal temperature: 18-26°C</li>
-            <li>💨 Ideal wind: &lt;15 km/h</li>
-            <li>☔ Rain reduces score significantly</li>
-            <li>💧 High humidity (80%+) reduces comfort</li>
-          </ul>
-        </div>
-      </details>
+      )}
     </div>
-  );
+  )
 }
