@@ -175,14 +175,11 @@ export default function EventCard({
           {/* Weather + Actions */}
           <div className="event-card-right">
             {weather && (
-              <div className="weather-badge">
-                <span className="weather-icon">{getWeatherIcon(weather.code)}</span>
-                <span className="weather-temp">{weather.temp}°</span>
-                {weather.rain > 20 && (
-                  <span className="weather-rain">💧{weather.rain}%</span>
-                )}
-              </div>
-            )}
+          <div className="weather-badge">
+            <span className="weather-icon">{getWeatherIcon(weather.code)}</span>
+            <span className="weather-temp">{weather.tempMin}° - {weather.tempMax}°</span>
+          </div>
+        )}
 
             <div className="event-card-actions">
               <button

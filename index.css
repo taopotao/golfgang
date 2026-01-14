@@ -701,34 +701,51 @@ textarea.input {
   margin-top: var(--space-3);
 }
 
-/* ---------- RSVP Buttons ---------- */
-.rsvp-buttons {
+/* RSVP Card - Less padding */
+.ep-rsvp-card {
+  padding: var(--space-3);
+}
+
+/* RSVP Buttons - Smaller and more compact */
+.ep-rsvp-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+  gap: 10px;
 }
 
-.rsvp-btn {
-  padding: 14px;
+.ep-rsvp-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 12px;  /* Reduced from var(--space-5) var(--space-4) */
   border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
-  font-family: var(--font-sans);
-  font-size: var(--text-md);
-  font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+  font-size: 14px;  /* Reduced from var(--text-md) */
+  font-weight: 600;
 }
 
-.rsvp-btn-available:hover,
-.rsvp-btn-available.active {
+.ep-rsvp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Smaller emoji */
+.ep-rsvp-emoji {
+  font-size: 24px;  /* Reduced from 32px */
+}
+
+.ep-rsvp-in:hover:not(:disabled) {
   background: var(--color-success-soft);
   border-color: var(--color-success);
   color: #065f46;
 }
 
-.rsvp-btn-unavailable:hover,
-.rsvp-btn-unavailable.active {
+.ep-rsvp-out:hover:not(:disabled) {
   background: var(--color-danger-soft);
   border-color: var(--color-danger);
   color: #991b1b;

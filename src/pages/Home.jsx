@@ -5,7 +5,10 @@ import { useAuth } from "../providers/AuthProvider";
 import { Link } from "react-router-dom";
 import EventCard from "../components/EventCard";
 import CalendarStrip from "../components/CalendarStrip";
+import CourseAutocomplete from "../components/CourseAutocomplete";
 import { showToast, hapticFeedback, triggerConfetti } from "../utils/helpers";
+import { fetchWeatherData, calculateGolfScore } from "../utils/weatherUtils";
+import { fetchWeatherForEvents, getWeatherIcon } from '../utils/sharedWeather';
 
 // Helper to get status from response
 const getResponseStatus = (response) => {
@@ -70,8 +73,14 @@ export default function Home() {
 
   const [form, setForm] = useState({
     date: "",
-    tee: "08:00",
-    courseName: "",
+    tee: "",
+    course: {
+      name: "",
+      placeId: "",
+      address: "",
+      lat: null,
+      lng: null,
+    },
     notes: "",
   });
 
@@ -94,64 +103,22 @@ export default function Home() {
     loadUsers();
   }, []);
 
-  // Fetch weather for event dates
-  useEffect(() => {
-    const fetchWeather = async () => {
-      const upcomingDates = events
-        .filter((e) => {
+    // Fetch weather for event dates using shared utility
+    useEffect(() => {
+      const fetchWeather = async () => {
+        if (events.length === 0) return;
+        
+        const upcomingEvents = events.filter((e) => {
           const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
           return d >= new Date();
-        })
-        .map((e) => {
-          const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
-          return d.toISOString().split("T")[0];
-        })
-        .filter((date, index, self) => self.indexOf(date) === index)
-        .slice(0, 7); // Only fetch for next 7 unique dates
-
-      for (const dateStr of upcomingDates) {
-        if (weatherCache[dateStr]) continue;
+        });
         
-        try {
-          // Using Open-Meteo API (free, no key required)
-          const [year, month, day] = dateStr.split("-");
-          const response = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=-33.87&longitude=151.21&daily=temperature_2m_max,precipitation_probability_max,weathercode&timezone=Australia/Sydney&start_date=${dateStr}&end_date=${dateStr}`
-          );
-          const data = await response.json();
-          
-          if (data.daily) {
-            setWeatherCache((prev) => ({
-              ...prev,
-              [dateStr]: {
-                temp: Math.round(data.daily.temperature_2m_max[0]),
-                rain: data.daily.precipitation_probability_max[0],
-                code: data.daily.weathercode[0],
-              },
-            }));
-          }
-        } catch (err) {
-          console.warn("Weather fetch failed:", err);
-        }
-      }
-    };
+        const weatherData = await fetchWeatherForEvents(upcomingEvents);
+        setWeatherCache(weatherData);
+      };
 
-    if (events.length > 0) {
       fetchWeather();
-    }
-  }, [events]);
-
-  // Get weather icon from code
-  const getWeatherIcon = (code) => {
-    if (code === 0) return "☀️";
-    if (code <= 3) return "⛅";
-    if (code <= 48) return "☁️";
-    if (code <= 67) return "🌧️";
-    if (code <= 77) return "🌨️";
-    if (code <= 82) return "🌧️";
-    if (code >= 95) return "⛈️";
-    return "🌤️";
-  };
+    }, [events]);
 
   // Filter and sort events
   const now = new Date();
@@ -220,10 +187,14 @@ export default function Home() {
       const eventDate = new Date(year, month - 1, day, 12, 0, 0);
 
       await addDoc(collection(db, "events"), {
-        title: formatDateAsTitle(form.date),
-        date: Timestamp.fromDate(eventDate),
-        tee: form.tee || null,
-        courseName: form.courseName || null,
+        title: form.date,
+        date: Timestamp.fromDate(new Date(form.date)),
+        tee: form.tee,
+        courseName: form.course.name || "",
+        coursePlaceId: form.course.placeId || "",
+        courseAddress: form.course.address || "",
+        courseLat: form.course.lat || null,
+        courseLng: form.course.lng || null,
         notes: form.notes || null,
         booked: false,
         createdBy: user.uid,
@@ -234,7 +205,12 @@ export default function Home() {
       });
 
       showToast("Round proposed! ⛳", "success");
-      setForm({ date: "", tee: "08:00", courseName: "", notes: "" });
+      setForm({ 
+        date: "", 
+        tee: "", 
+        course: { name: "", placeId: "", address: "", lat: null, lng: null },
+        notes: "" 
+      });
       setShowForm(false);
     } catch (error) {
       console.error("Error creating event:", error);
@@ -357,12 +333,21 @@ export default function Home() {
               </div>
               <div className="form-group">
                 <label>Course (optional)</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g. Royal Sydney Golf Club"
-                  value={form.courseName}
-                  onChange={(e) => setForm({ ...form, courseName: e.target.value })}
+                <CourseAutocomplete
+                  value={form.course?.name || ""}
+                  onSelect={(courseData) => {
+                    console.log('Course selected:', courseData); // Debug log
+                    setForm({ 
+                      ...form, 
+                      course: {
+                        name: courseData.name,
+                        placeId: courseData.placeId || "",
+                        address: courseData.address || "",
+                        lat: courseData.lat || null,
+                        lng: courseData.lng || null,
+                      }
+                    });
+                  }}
                 />
               </div>
               <div className="form-group">

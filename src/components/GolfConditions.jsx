@@ -134,9 +134,9 @@ export default function GolfConditions({ lat, lng, date, coursePlaceId, compact 
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+      <div style={{ textAlign: 'center', padding: '20px' }}>
         <div className="spinner"></div>
-        <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+        <p style={{ marginTop: '8px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
           Loading weather...
         </p>
       </div>
@@ -145,7 +145,7 @@ export default function GolfConditions({ lat, lng, date, coursePlaceId, compact 
 
   if (error) {
     return (
-      <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--color-text-secondary)' }}>
+      <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>
         <p>{error}</p>
       </div>
     );
@@ -159,135 +159,120 @@ export default function GolfConditions({ lat, lng, date, coursePlaceId, compact 
   if (compact) {
     return (
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 'var(--space-3)',
-        padding: 'var(--space-3)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 16px',
+        gap: '12px',
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--text-2xl)' }}>
-            {getWeatherEmoji(weather.weatherCode)}
-          </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '24px' }}>{getWeatherEmoji(weather.weatherCode)}</span>
+          <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
             {weather.conditions}
-          </div>
+          </span>
         </div>
         
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>
-            {weather.temperature}°C
-          </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-            Temperature
-          </div>
+        <div style={{ fontSize: '16px', fontWeight: 600 }}>
+          {weather.tempMin}° - {weather.tempMax}°
         </div>
         
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 'var(--text-xl)', 
-            fontWeight: 600,
-            color: getPlayabilityColor(weather.playabilityScore)
-          }}>
-            {weather.playabilityScore}/10
-          </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-            {getPlayabilityLabel(weather.playabilityScore)}
-          </div>
+        <div style={{ 
+          fontSize: '14px', 
+          fontWeight: 600,
+          color: getPlayabilityColor(weather.playabilityScore)
+        }}>
+          {weather.playabilityScore}/10
         </div>
       </div>
     );
   }
 
-  // Full expanded view
+  // Full expanded view - COMPACT LAYOUT
   return (
-    <div style={{ padding: 'var(--space-4)' }}>
+    <div style={{ padding: '12px 16px' }}>
+      {/* Main weather display - horizontal layout */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: 'var(--space-4)',
-        marginBottom: 'var(--space-4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px',
+        background: 'var(--color-bg)',
+        borderRadius: '10px',
+        marginBottom: '8px',
       }}>
-        <div style={{
-          textAlign: 'center',
-          padding: 'var(--space-4)',
-          background: 'var(--color-bg)',
-          borderRadius: 'var(--radius-md)',
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: 'var(--space-2)' }}>
-            {getWeatherEmoji(weather.weatherCode)}
-          </div>
-          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>
-            {weather.conditions}
+        {/* Weather icon and condition */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '32px' }}>{getWeatherEmoji(weather.weatherCode)}</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text)' }}>
+              {weather.conditions}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              {weather.tempMin}° - {weather.tempMax}°
+            </div>
           </div>
         </div>
-
-        <div style={{
-          textAlign: 'center',
-          padding: 'var(--space-4)',
-          background: 'var(--color-bg)',
-          borderRadius: 'var(--radius-md)',
-        }}>
-          <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700 }}>
+        
+        {/* Temperature */}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-text)' }}>
             {weather.temperature}°C
-          </div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-            {weather.tempMin}° - {weather.tempMax}°
           </div>
         </div>
       </div>
 
+      {/* Stats row */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 'var(--space-3)',
+        gap: '6px',
       }}>
+        {/* Wind */}
         <div style={{
-          padding: 'var(--space-3)',
+          padding: '8px',
           background: 'var(--color-bg)',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: '8px',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>
             Wind
           </div>
-          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginTop: 'var(--space-1)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
             {weather.windSpeed} km/h
           </div>
         </div>
 
+        {/* Rain */}
         <div style={{
-          padding: 'var(--space-3)',
+          padding: '8px',
           background: 'var(--color-bg)',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: '8px',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>
             Rain
           </div>
-          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginTop: 'var(--space-1)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
             {weather.precipitation} mm
           </div>
         </div>
 
+        {/* Score */}
         <div style={{
-          padding: 'var(--space-3)',
+          padding: '8px',
           background: 'var(--color-bg)',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: '8px',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-            Playability
+          <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>
+            Score
           </div>
           <div style={{ 
-            fontSize: 'var(--text-lg)', 
+            fontSize: '13px', 
             fontWeight: 700, 
-            marginTop: 'var(--space-1)',
             color: getPlayabilityColor(weather.playabilityScore)
           }}>
             {weather.playabilityScore}/10
-          </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-            {getPlayabilityLabel(weather.playabilityScore)}
           </div>
         </div>
       </div>

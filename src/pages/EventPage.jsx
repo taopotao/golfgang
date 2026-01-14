@@ -6,6 +6,13 @@ import { useAuth } from "../providers/AuthProvider";
 import GolfConditions from "../components/GolfConditions";
 import CalendarMenu from "../components/CalendarMenu";
 import CourseAutocomplete from "../components/CourseAutocomplete";
+import PlacePhoto from '../components/PlacePhoto';
+
+// Helper to extract just the course name from a potentially full address
+function extractCourseName(fullName) {
+  if (!fullName) return '';
+  return fullName.split(',')[0].trim();
+}
 
 // Build Google Calendar URL
 function buildGoogleCalendarUrl(event, eventUrl) {
@@ -250,7 +257,7 @@ export default function EventPage() {
     let msg = `⛳ *${event.title || "Golf round"}*\n`;
     if (dateStr) msg += `📅 ${dateStr}\n`;
     if (event.tee) msg += `🕐 ${event.tee}\n`;
-    if (event.courseName) msg += `📍 ${event.courseName}\n`;
+    if (event.courseName) msg += `📍 ${extractCourseName(event.courseName)}\n`;
     msg += `\n🔗 ${eventUrl}`;
 
     try {
@@ -374,16 +381,12 @@ export default function EventPage() {
       <div className="ep-hero">
         {hasCourseInfo ? (
           <div className="ep-hero-image">
-            <div style={{
-              width: '100%',
-              height: '100%',
-              background: 'linear-gradient(135deg, #0f7b6c 0%, #10b981 50%, #059669 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <span style={{ fontSize: 64, opacity: 0.3 }}>⛳</span>
-            </div>
+            <PlacePhoto 
+              placeId={event.coursePlaceId}
+              courseName={event.courseName}
+              alt={extractCourseName(event.courseName)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
             <div className="ep-hero-overlay" />
           </div>
         ) : (
@@ -431,7 +434,7 @@ export default function EventPage() {
             </svg>
             {event.courseName ? (
               <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="ep-info-value ep-course-link">
-                {event.courseName}
+                {extractCourseName(event.courseName)}
                 <span className="ep-link-arrow">↗</span>
               </a>
             ) : (
@@ -488,7 +491,7 @@ export default function EventPage() {
           <div className="form-group">
             <label>Course</label>
             <CourseAutocomplete
-              value={form.courseName}
+              value={extractCourseName(form.courseName)}
               onSelect={(place) => {
                 setForm({
                   ...form,
@@ -643,9 +646,21 @@ export default function EventPage() {
                   </span>
                   {(prefs.timePreference || prefs.cartPreference || prefs.formatPreference) && (
                     <div className="ep-player-prefs">
-                      {prefs.timePreference && <span className="ep-pref-tag">{prefs.timePreference}</span>}
-                      {prefs.cartPreference && <span className="ep-pref-tag">{prefs.cartPreference}</span>}
-                      {prefs.formatPreference && <span className="ep-pref-tag">{prefs.formatPreference}</span>}
+                      {prefs.timePreference && (
+                        <span className="ep-pref-tag">
+                          {prefs.timePreference === 'AM' ? '🌅' : prefs.timePreference === 'PM' ? '🌇' : '🕐'} {prefs.timePreference}
+                        </span>
+                      )}
+                      {prefs.cartPreference && (
+                        <span className="ep-pref-tag">
+                          {prefs.cartPreference === 'Walk' ? '🚶' : prefs.cartPreference === 'Cart' ? '🚗' : '🚗'} {prefs.cartPreference}
+                        </span>
+                      )}
+                      {prefs.formatPreference && (
+                        <span className="ep-pref-tag">
+                          {prefs.formatPreference === 'Stroke' ? '🎯' : prefs.formatPreference === 'Scramble' ? '👥' : '🏌️'} {prefs.formatPreference}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
