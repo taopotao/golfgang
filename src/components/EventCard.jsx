@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useAuth } from "../providers/AuthProvider";
 import {
   showToast,
@@ -8,6 +9,7 @@ import {
   buildGoogleCalendarUrl,
   triggerConfetti,
 } from "../utils/helpers";
+
 
 // Helper to get status from response
 const getResponseStatus = (response) => {
@@ -24,6 +26,17 @@ export default function EventCard({
   relativeTime,
 }) {
   const { user } = useAuth();
+
+  // Force re-render every minute for countdown
+const [, setTick] = useState(0);
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    setTick(t => t + 1);
+  }, 60000); // Update every minute
+  
+  return () => clearInterval(interval);
+}, []);
 
   const dateObj = event.date?.toDate ? event.date.toDate() : new Date(event.date);
 
@@ -162,15 +175,45 @@ export default function EventCard({
                 {event.courseName && (
                   <span className="meta-item">📍 {event.courseName}</span>
                 )}
-                {event.rsvpDeadline && (
-                  <span className="meta-item">
-                    ⏰ RSVP by {(event.rsvpDeadline.toDate ? event.rsvpDeadline.toDate() : new Date(event.rsvpDeadline)).toLocaleDateString("en-AU", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short"
-                    })}
-                  </span>
-                )}
+                {event.rsvpDeadline && (() => {
+  const deadline = event.rsvpDeadline.toDate ? event.rsvpDeadline.toDate() : new Date(event.rsvpDeadline);
+  const now = new Date();
+  const diffMs = deadline - now;
+  const hoursLeft = Math.floor(diffMs / (1000 * 60 * 60));
+  const daysLeft = Math.floor(hoursLeft / 24);
+  
+  // Already passed
+  if (diffMs < 0) {
+    return <span className="meta-item rsvp-closed">⚠️ RSVP closed</span>;
+  }
+  
+  // Less than 6 hours
+  if (hoursLeft < 6) {
+    const minsLeft = Math.floor(diffMs / (1000 * 60));
+    return <span className="meta-item rsvp-urgent">🔥 {minsLeft < 60 ? `${minsLeft}m` : `${hoursLeft}h`} left!</span>;
+  }
+  
+  // Less than 24 hours
+  if (hoursLeft < 24) {
+    return <span className="meta-item rsvp-soon">⏰ {hoursLeft}h left to RSVP</span>;
+  }
+  
+  // Less than 48 hours
+  if (hoursLeft < 48) {
+    return <span className="meta-item rsvp-tomorrow">⏰ RSVP by tomorrow</span>;
+  }
+  
+  // More than 2 days - show date
+  return (
+    <span className="meta-item">
+      ⏰ RSVP by {deadline.toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "numeric",
+        month: "short"
+      })}
+    </span>
+  );
+})()}
               </div>
 
             {/* Creator */}

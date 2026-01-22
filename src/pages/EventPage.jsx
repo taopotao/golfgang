@@ -125,8 +125,8 @@ export default function EventPage() {
           courseLng: data.courseLng || null,
           tee: data.tee || "",
           rsvpDeadline: data.rsvpDeadline
-            ? new Date(data.rsvpDeadline.toDate()).toISOString().slice(0, 16)
-            : "",
+  ? data.rsvpDeadline.toDate().toISOString().split("T")[0]
+  : "",
         });
       } catch (err) {
         console.error("Error loading event:", err);
@@ -195,34 +195,44 @@ export default function EventPage() {
   }
 
   // Save event edits
-  async function saveEdits() {
-    try {
-      const ref = doc(db, "events", id);
-      await updateDoc(ref, {
-        title: form.title,
-        notes: form.notes,
-        courseName: form.courseName,
-        courseAddress: form.courseAddress,
-        coursePlaceId: form.coursePlaceId,
-        coursePhotoUrl: form.coursePhotoUrl,
-        courseLat: form.courseLat || null,
-        courseLng: form.courseLng || null,
-        tee: form.tee,
-        rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline + "T23:59:59") : null,
-      });
-      
-      setEvent(prev => ({
-        ...prev,
-        ...form,
-        rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline) : null,
-      }));
-      setEditing(false);
-      showToast("Event updated!");
-    } catch (err) {
-      console.error("Error saving event:", err);
-      showToast("Failed to save", "error");
+async function saveEdits() {
+  try {
+    const ref = doc(db, "events", id);
+    
+    // Build the update object
+    const updateData = {
+      title: form.title,
+      notes: form.notes,
+      courseName: form.courseName,
+      courseAddress: form.courseAddress,
+      coursePlaceId: form.coursePlaceId,
+      coursePhotoUrl: form.coursePhotoUrl,
+      courseLat: form.courseLat || null,
+      courseLng: form.courseLng || null,
+      tee: form.tee,
+    };
+    
+    // Only add rsvpDeadline if it has a value
+    if (form.rsvpDeadline && form.rsvpDeadline.trim() !== "") {
+      updateData.rsvpDeadline = new Date(form.rsvpDeadline + "T23:59:59");
+    } else {
+      updateData.rsvpDeadline = null;
     }
+    
+    await updateDoc(ref, updateData);
+    
+    setEvent(prev => ({
+      ...prev,
+      ...form,
+      rsvpDeadline: updateData.rsvpDeadline,
+    }));
+    setEditing(false);
+    showToast("Event updated!");
+  } catch (err) {
+    console.error("Error saving event:", err);
+    showToast("Failed to save", "error");
   }
+}
 
   // Delete event
   async function deleteEvent() {
@@ -472,6 +482,57 @@ export default function EventPage() {
           </div>
         )}
       </div>
+
+{/* RSVP Deadline Countdown */}
+      {event.rsvpDeadline && !event.booked && !editing && (() => {
+        const deadline = event.rsvpDeadline.toDate ? event.rsvpDeadline.toDate() : new Date(event.rsvpDeadline);
+        const now = new Date();
+        const diffMs = deadline - now;
+        const hoursLeft = Math.floor(diffMs / (1000 * 60 * 60));
+        
+        if (diffMs < 0) {
+          return (
+            <div className="ep-rsvp-deadline closed">
+              ⚠️ RSVP deadline has passed
+            </div>
+          );
+        }
+        
+        if (hoursLeft < 6) {
+          const minsLeft = Math.floor(diffMs / (1000 * 60));
+          return (
+            <div className="ep-rsvp-deadline urgent">
+              🔥 Only {minsLeft < 60 ? `${minsLeft} minutes` : `${hoursLeft} hours`} left to RSVP!
+            </div>
+          );
+        }
+        
+        if (hoursLeft < 24) {
+          return (
+            <div className="ep-rsvp-deadline soon">
+              ⏰ {hoursLeft} hours left to RSVP
+            </div>
+          );
+        }
+        
+        if (hoursLeft < 48) {
+          return (
+            <div className="ep-rsvp-deadline tomorrow">
+              ⏰ RSVP by tomorrow
+            </div>
+          );
+        }
+        
+        return (
+          <div className="ep-rsvp-deadline">
+            ⏰ RSVP by {deadline.toLocaleDateString("en-AU", {
+              weekday: "long",
+              day: "numeric",
+              month: "short"
+            })}
+          </div>
+        );
+      })()}
 
       {/* EDITING MODE */}
       {editing && (
