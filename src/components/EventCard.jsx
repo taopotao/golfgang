@@ -154,15 +154,24 @@ export default function EventCard({
             </div>
 
             {/* Meta info */}
-            <div className="event-card-meta">
-              {relativeTime && (
-                <span className="meta-item countdown">{relativeTime}</span>
-              )}
-              {event.tee && <span className="meta-item">🕐 {event.tee}</span>}
-              {event.courseName && (
-                <span className="meta-item">📍 {event.courseName}</span>
-              )}
-            </div>
+              <div className="event-card-meta">
+                {relativeTime && (
+                  <span className="meta-item countdown">{relativeTime}</span>
+                )}
+                {event.tee && <span className="meta-item">🕐 {event.tee}</span>}
+                {event.courseName && (
+                  <span className="meta-item">📍 {event.courseName}</span>
+                )}
+                {event.rsvpDeadline && (
+                  <span className="meta-item">
+                    ⏰ RSVP by {(event.rsvpDeadline.toDate ? event.rsvpDeadline.toDate() : new Date(event.rsvpDeadline)).toLocaleDateString("en-AU", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short"
+                    })}
+                  </span>
+                )}
+              </div>
 
             {/* Creator */}
             {creatorName && (

@@ -76,6 +76,7 @@ export default function Home() {
   tee: "", 
   course: { name: "", placeId: "", address: "", lat: null, lng: null },
   notes: "",
+  rsvpDeadline: "",
   preferences: {
     timePreference: null,    // "AM", "PM", or "Any"
     cartPreference: null,    // "Walk", "Cart", or "Any"
@@ -195,6 +196,7 @@ export default function Home() {
         courseLat: form.course.lat || null,
         courseLng: form.course.lng || null,
         notes: form.notes || null,
+        rsvpDeadline: form.rsvpDeadline ? Timestamp.fromDate(new Date(form.rsvpDeadline + "T23:59:59")) : null,
         booked: false,
         createdBy: user.uid,
         createdAt: Timestamp.now(),
@@ -213,6 +215,7 @@ export default function Home() {
         tee: "", 
         course: { name: "", placeId: "", address: "", lat: null, lng: null },
         notes: "",
+        rsvpDeadline: "",
         preferences: {
           timePreference: null,
           cartPreference: null,
@@ -337,6 +340,21 @@ export default function Home() {
                     value={form.tee}
                     onChange={(e) => setForm({ ...form, tee: e.target.value })}
                   />
+                </div>
+                {/* RSVP Deadline */}
+                <div className="form-group">
+                  <label>RSVP by (optional)</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={form.rsvpDeadline}
+                    onChange={(e) => setForm({ ...form, rsvpDeadline: e.target.value })}
+                    min={new Date().toISOString().split("T")[0]}
+                    max={form.date || undefined}
+                  />
+                  <p style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+                    Deadline for responses before the round
+                  </p>
                 </div>
               </div>
               <div className="form-group">

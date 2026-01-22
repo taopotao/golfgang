@@ -208,7 +208,7 @@ export default function EventPage() {
         courseLat: form.courseLat || null,
         courseLng: form.courseLng || null,
         tee: form.tee,
-        rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline) : null,
+        rsvpDeadline: form.rsvpDeadline ? new Date(form.rsvpDeadline + "T23:59:59") : null,
       });
       
       setEvent(prev => ({
@@ -514,6 +514,19 @@ export default function EventPage() {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
               placeholder="Any additional details..."
             />
+          </div>
+
+          <div className="form-group">
+            <label>RSVP Deadline</label>
+            <input
+              type="date"
+              className="input"
+              value={form.rsvpDeadline ? form.rsvpDeadline.split("T")[0] : ""}
+              onChange={(e) => setForm({ ...form, rsvpDeadline: e.target.value })}
+            />
+            <p style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+              Responses due by 11:59 PM on this date
+            </p>
           </div>
 
           <div className="ep-edit-actions">
