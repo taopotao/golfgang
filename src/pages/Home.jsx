@@ -71,18 +71,17 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [weatherCache, setWeatherCache] = useState({});
 
-  const [form, setForm] = useState({
-    date: "",
-    tee: "",
-    course: {
-      name: "",
-      placeId: "",
-      address: "",
-      lat: null,
-      lng: null,
-    },
-    notes: "",
-  });
+  const [form, setForm] = useState({ 
+  date: "", 
+  tee: "", 
+  course: { name: "", placeId: "", address: "", lat: null, lng: null },
+  notes: "",
+  preferences: {
+    timePreference: null,    // "AM", "PM", or "Any"
+    cartPreference: null,    // "Walk", "Cart", or "Any"
+    formatPreference: null,  // "Stroke", "Scramble", or "Any"
+  }
+});
 
   // Load events
   useEffect(() => {
@@ -187,7 +186,7 @@ export default function Home() {
       const eventDate = new Date(year, month - 1, day, 12, 0, 0);
 
       await addDoc(collection(db, "events"), {
-        title: form.date,
+        title: formatDateAsTitle(form.date),
         date: Timestamp.fromDate(new Date(form.date)),
         tee: form.tee,
         courseName: form.course.name || "",
@@ -200,7 +199,11 @@ export default function Home() {
         createdBy: user.uid,
         createdAt: Timestamp.now(),
         responses: {
-          [user.uid]: { status: "available", respondedAt: Timestamp.now() },
+          [user.uid]: { 
+            status: "available", 
+            respondedAt: Timestamp.now(),
+            preferences: form.preferences,
+          },
         },
       });
 
@@ -209,7 +212,12 @@ export default function Home() {
         date: "", 
         tee: "", 
         course: { name: "", placeId: "", address: "", lat: null, lng: null },
-        notes: "" 
+        notes: "",
+        preferences: {
+          timePreference: null,
+          cartPreference: null,
+          formatPreference: null,
+        }
       });
       setShowForm(false);
     } catch (error) {
@@ -360,6 +368,91 @@ export default function Home() {
                   rows={2}
                 />
               </div>
+              {/* Preferences */}
+<div className="form-group">
+  <label>Your Preferences (optional)</label>
+  
+  {/* Time Preference */}
+  <div style={{ marginBottom: 12 }}>
+    <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginBottom: 6 }}>Time</div>
+    <div style={{ display: "flex", gap: 8 }}>
+      {['AM', 'PM', 'Any'].map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setForm({ ...form, preferences: { ...form.preferences, timePreference: opt } })}
+          style={{
+            flex: 1,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: form.preferences.timePreference === opt ? "2px solid var(--color-primary)" : "2px solid var(--color-border)",
+            background: form.preferences.timePreference === opt ? "var(--color-primary)" : "white",
+            color: form.preferences.timePreference === opt ? "white" : "var(--color-text)",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          {opt === 'AM' ? '🌅' : opt === 'PM' ? '☀️' : '🤷'} {opt}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* Transport Preference */}
+  <div style={{ marginBottom: 12 }}>
+    <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginBottom: 6 }}>Transport</div>
+    <div style={{ display: "flex", gap: 8 }}>
+      {['Walk', 'Cart', 'Any'].map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setForm({ ...form, preferences: { ...form.preferences, cartPreference: opt } })}
+          style={{
+            flex: 1,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: form.preferences.cartPreference === opt ? "2px solid var(--color-primary)" : "2px solid var(--color-border)",
+            background: form.preferences.cartPreference === opt ? "var(--color-primary)" : "white",
+            color: form.preferences.cartPreference === opt ? "white" : "var(--color-text)",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          {opt === 'Walk' ? '🚶' : opt === 'Cart' ? '🛺' : '🤷'} {opt}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* Format Preference */}
+  <div>
+    <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginBottom: 6 }}>Format</div>
+    <div style={{ display: "flex", gap: 8 }}>
+      {['Stroke', 'Scramble', 'Any'].map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => setForm({ ...form, preferences: { ...form.preferences, formatPreference: opt } })}
+          style={{
+            flex: 1,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: form.preferences.formatPreference === opt ? "2px solid var(--color-primary)" : "2px solid var(--color-border)",
+            background: form.preferences.formatPreference === opt ? "var(--color-primary)" : "white",
+            color: form.preferences.formatPreference === opt ? "white" : "var(--color-text)",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          {opt === 'Stroke' ? '🎯' : opt === 'Scramble' ? '👥' : '🤷'} {opt}
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
               <button
                 type="submit"
                 className="btn btn-primary btn-full"
